@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Stress Bubble",
+  "description": "Stress Bubble mini-game for New Tab.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Stress Bubble",
+    "default_popup": "src/popup/popup.html"
+  },
+  "chrome_url_overrides": {
+    "newtab": "src/newtab/newtab.html"
+  },
+  "permissions": ["storage"]
+}

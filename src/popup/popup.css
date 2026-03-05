@@ -1,0 +1,5 @@
+﻿:root { --ui-scale: 1.12; }
+
+body { width: 420px; height: 560px; }
+
+canvas#game { width: 100%; height: 100%; }

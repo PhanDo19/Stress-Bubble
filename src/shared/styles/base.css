@@ -1,0 +1,45 @@
+﻿:root {
+  --bg: #0b1220;
+  --panel: #131c2e;
+  --text: #e6edf7;
+  --muted: #9fb0cc;
+  --ui-scale: 1;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(120% 120% at 50% 0%, #14213a 0%, #0b1220 60%, #070c16 100%);
+  color: var(--text);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+.app {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.app.full {
+  padding: 24px;
+}
+
+canvas#game {
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  width: 100%;
+  height: 100%;
+}
+
+.loading {
+  position: absolute;
+  color: var(--muted);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
