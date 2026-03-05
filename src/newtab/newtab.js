@@ -27,6 +27,9 @@ const DEFAULT_SETTINGS = {
   sfx: true,
   music: true,
   vibe: false,
+  sfxVolume: 0.8,
+  musicVolume: 0.4,
+  musicStyle: 'chill',
   difficulty: 'normal',
 };
 
@@ -152,6 +155,11 @@ function normalizeSettings(settings) {
   next.sfx = !!next.sfx;
   next.music = !!next.music;
   next.vibe = !!next.vibe;
+  next.sfxVolume = Math.max(0, Math.min(1, Number(next.sfxVolume)));
+  next.musicVolume = Math.max(0, Math.min(1, Number(next.musicVolume)));
+  if (!['chill', 'hiphop', 'minimal'].includes(next.musicStyle)) {
+    next.musicStyle = 'chill';
+  }
   return next;
 }
 

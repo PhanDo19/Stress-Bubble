@@ -64,6 +64,46 @@ function createButton(text, isActive = false, variant = 'ghost') {
   return button;
 }
 
+function createSlider(label, value, onChange) {
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'flex';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.gap = '10px';
+  wrapper.style.justifyContent = 'center';
+
+  const text = document.createElement('div');
+  text.textContent = label;
+  text.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  text.style.opacity = '0.75';
+  text.style.minWidth = '70px';
+  text.style.textAlign = 'left';
+
+  const range = document.createElement('input');
+  range.type = 'range';
+  range.min = '0';
+  range.max = '100';
+  range.value = String(Math.round((Number(value) || 0) * 100));
+  range.style.width = '140px';
+
+  const valueEl = document.createElement('div');
+  valueEl.textContent = `${range.value}%`;
+  valueEl.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  valueEl.style.opacity = '0.75';
+  valueEl.style.minWidth = '44px';
+
+  range.addEventListener('input', () => {
+    valueEl.textContent = `${range.value}%`;
+    if (typeof onChange === 'function') {
+      onChange(Number(range.value) / 100);
+    }
+  });
+
+  wrapper.appendChild(text);
+  wrapper.appendChild(range);
+  wrapper.appendChild(valueEl);
+  return wrapper;
+}
+
 export function renderHome({
   rootEl,
   model,
@@ -270,6 +310,38 @@ export function renderHome({
   difficultyBlock.appendChild(difficultyLabel);
   difficultyBlock.appendChild(difficultyRow);
 
+  const musicStyleBlock = document.createElement('div');
+  musicStyleBlock.style.display = 'flex';
+  musicStyleBlock.style.flexDirection = 'column';
+  musicStyleBlock.style.gap = '8px';
+
+  const musicStyleLabel = document.createElement('div');
+  musicStyleLabel.textContent = 'Music Style';
+  musicStyleLabel.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  musicStyleLabel.style.opacity = '0.75';
+
+  const musicStyleRow = document.createElement('div');
+  musicStyleRow.style.display = 'flex';
+  musicStyleRow.style.gap = '8px';
+  musicStyleRow.style.justifyContent = 'center';
+
+  const styles = [
+    { key: 'chill', label: 'Chill' },
+    { key: 'hiphop', label: 'HipHop' },
+    { key: 'minimal', label: 'Minimal' },
+  ];
+
+  styles.forEach((style) => {
+    const btn = createButton(style.label, settings?.musicStyle === style.key);
+    btn.addEventListener('click', () => {
+      if (typeof onSettingsChange === 'function') onSettingsChange({ musicStyle: style.key });
+    });
+    musicStyleRow.appendChild(btn);
+  });
+
+  musicStyleBlock.appendChild(musicStyleLabel);
+  musicStyleBlock.appendChild(musicStyleRow);
+
   const resetRow = document.createElement('div');
   resetRow.style.display = 'flex';
   resetRow.style.justifyContent = 'center';
@@ -282,7 +354,25 @@ export function renderHome({
   resetRow.appendChild(resetButton);
 
   settingsPanel.appendChild(togglesRow);
+
+  const volumeBlock = document.createElement('div');
+  volumeBlock.style.display = 'flex';
+  volumeBlock.style.flexDirection = 'column';
+  volumeBlock.style.gap = '8px';
+  volumeBlock.style.alignItems = 'center';
+
+  const sfxSlider = createSlider('SFX Vol', settings?.sfxVolume ?? 0.8, (value) => {
+    if (typeof onSettingsChange === 'function') onSettingsChange({ sfxVolume: value });
+  });
+  const musicSlider = createSlider('Music Vol', settings?.musicVolume ?? 0.4, (value) => {
+    if (typeof onSettingsChange === 'function') onSettingsChange({ musicVolume: value });
+  });
+
+  volumeBlock.appendChild(sfxSlider);
+  volumeBlock.appendChild(musicSlider);
+  settingsPanel.appendChild(volumeBlock);
   settingsPanel.appendChild(difficultyBlock);
+  settingsPanel.appendChild(musicStyleBlock);
   settingsPanel.appendChild(resetRow);
 
   let settingsOpen = false;
