@@ -10,10 +10,14 @@ import {
   loadDaily,
   loadShop,
   loadSettings,
+  loadTutorial,
+  loadAchievements,
   save,
   saveBestScore,
   saveShop,
   saveSettings,
+  saveTutorial,
+  saveAchievements,
   clearAll,
 } from '../shared/storage/storage.js';
 import { getTodayKey, getDailyChallenge, evaluateDailyProgress } from '../shared/systems/dailySystem.js';
@@ -22,6 +26,7 @@ import { coinsForRun } from '../shared/systems/coinSystem.js';
 import { setupHiDPICanvas } from '../shared/render/canvasScale.js';
 import { buyItem } from '../shared/ui/shopSystem.js';
 import { createAudioManager } from '../shared/audio/audioManager.js';
+import { evaluateAchievements } from '../shared/systems/achievementSystem.js';
 
 const DEFAULT_SETTINGS = {
   sfx: true,
@@ -65,6 +70,7 @@ const CONFIG_BASE = {
   },
   maxBubbles: 12,
   maxParticles: 30,
+  maxFloatingTexts: 24,
 };
 
 const CONFIG = {
@@ -76,6 +82,7 @@ const CONFIG = {
   stressValues: {},
   maxBubbles: 0,
   maxParticles: 0,
+  maxFloatingTexts: 0,
 };
 
 function cloneMap(map) {
@@ -95,6 +102,7 @@ function resetConfig(target, base) {
   target.stressValues = cloneMap(base.stressValues);
   target.maxBubbles = base.maxBubbles;
   target.maxParticles = base.maxParticles;
+  target.maxFloatingTexts = base.maxFloatingTexts;
 }
 
 function scaleMap(map, factor) {
@@ -215,17 +223,36 @@ function computeRank(score) {
     ? `Need ${Math.max(0, nextTier.min - score)} for ${nextTier.name}`
     : 'Top rank';
 
-  return { rank: rank.name, nearMiss };
+  const progress = nextTier
+    ? Math.max(0, Math.min(1, (score - rank.min) / (nextTier.min - rank.min)))
+    : 1;
+
+  return {
+    rank: rank.name,
+    nearMiss,
+    rankProgress: nextTier
+      ? {
+          currentRank: rank.name,
+          nextRank: nextTier.name,
+          currentScore: score,
+          nextScore: nextTier.min,
+          progress,
+        }
+      : null,
+  };
 }
 
 async function loadModel() {
-  const [bestScores, coins, streak, daily, shop, settings] = await Promise.all([
+  const [bestScores, coins, streak, daily, shop, settings, tutorialSeen, achievements] =
+    await Promise.all([
     loadBestScores(),
     loadCoins(),
     loadStreak(),
     loadDaily(),
     loadShop(),
     loadSettings(),
+    loadTutorial(),
+    loadAchievements(),
   ]);
 
   const todayKey = getTodayKey();
@@ -245,6 +272,8 @@ async function loadModel() {
     ownedSkins,
     selectedSkin,
     settings: normalizeSettings(settings),
+    tutorialSeen: !!tutorialSeen,
+    achievements: Array.isArray(achievements) ? achievements : [],
   };
 }
 
@@ -286,6 +315,13 @@ async function setup() {
       },
       onPlay: () => startGame(selectedMode),
       onShop: () => showShop(),
+      showTutorial: !model.tutorialSeen,
+      onDismissTutorial: async () => {
+        if (model.tutorialSeen) return;
+        model.tutorialSeen = true;
+        await saveTutorial(true);
+        showHome();
+      },
       onSettingsChange: async (patch) => {
         model.settings = normalizeSettings({ ...model.settings, ...patch });
         applyDifficulty(CONFIG, CONFIG_BASE, model.settings.difficulty);
@@ -364,6 +400,11 @@ async function setup() {
 
     const todayKey = getTodayKey();
     model.streak = updateStreak(model.streak, todayKey, true);
+    const streakReward = Number(model.streak?.rewardCoins) || 0;
+    if (streakReward > 0) {
+      model.coins += streakReward;
+      model.streak.rewardCoins = 0;
+    }
 
     model.daily = evaluateDailyProgress(model.daily, runStats);
 
@@ -372,19 +413,32 @@ async function setup() {
     model.bestScores = await saveBestScore(modeKey, runStats.score);
     const isPersonalBest = runStats.score > previousBest;
 
+    const achievementResult = evaluateAchievements(model.achievements, runStats);
+    model.achievements = achievementResult.unlocked;
+
     await save({
       coins: model.coins,
       streak: model.streak,
       daily: model.daily,
       bestScores: model.bestScores,
     });
+    await saveAchievements(model.achievements);
 
     const result = {
       score: runStats.score,
       rank: rankInfo.rank,
       nearMiss: rankInfo.nearMiss,
+      rankProgress: rankInfo.rankProgress,
       coinsEarned,
       mode: runStats.mode,
+      achievementsUnlocked: achievementResult.newlyUnlocked,
+      runStats: {
+        pops: runStats.pops || 0,
+        misses: runStats.misses || 0,
+        maxCombo: runStats.maxCombo || 0,
+        goldenCount: runStats.goldenCount || 0,
+        bombHits: runStats.bombHits || 0,
+      },
     };
 
     lastResult = result;
@@ -393,6 +447,10 @@ async function setup() {
   }
 
   function startGame(mode = selectedMode) {
+    if (!model.tutorialSeen) {
+      model.tutorialSeen = true;
+      saveTutorial(true);
+    }
     overlay.innerHTML = '';
     overlay.style.pointerEvents = 'none';
     engine.selectedSkin = model.selectedSkin || 'skin_classic';

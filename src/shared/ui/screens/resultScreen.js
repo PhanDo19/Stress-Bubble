@@ -1,4 +1,6 @@
-﻿function ensureRoot(rootEl) {
+﻿import { ACHIEVEMENTS } from '../../systems/achievementSystem.js';
+
+function ensureRoot(rootEl) {
   if (!rootEl) return null;
   rootEl.innerHTML = '';
   return rootEl;
@@ -64,7 +66,12 @@ export function renderResult({
   const score = result?.score ?? 0;
   const rank = result?.rank ?? 'Bronze';
   const nearMiss = result?.nearMiss ?? '';
+  const rankProgress = result?.rankProgress || null;
   const coinsEarned = result?.coinsEarned ?? 0;
+  const runStats = result?.runStats || null;
+  const achievementsUnlocked = Array.isArray(result?.achievementsUnlocked)
+    ? result.achievementsUnlocked
+    : [];
 
   const dailyInfo = formatDaily(model?.daily);
 
@@ -95,12 +102,16 @@ export function renderResult({
 
   const rankEl = document.createElement('div');
   rankEl.textContent = `Rank: ${rank}`;
-  rankEl.style.fontSize = 'calc(16px * var(--ui-scale, 1))';
+  rankEl.style.fontSize = 'calc(18px * var(--ui-scale, 1))';
+  rankEl.style.fontWeight = '600';
+  rankEl.style.color = '#fef08a';
 
   const nearEl = document.createElement('div');
   nearEl.textContent = nearMiss;
   nearEl.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
   nearEl.style.opacity = '0.75';
+  nearEl.style.marginTop = '-2px';
+  nearEl.style.color = 'rgba(255,255,255,0.7)';
 
   const pbEl = document.createElement('div');
   pbEl.textContent = isPersonalBest ? 'Personal Best!' : '';
@@ -110,6 +121,39 @@ export function renderResult({
   const coinsEl = document.createElement('div');
   coinsEl.textContent = `Coins: +${coinsEarned}`;
   coinsEl.style.fontSize = 'calc(15px * var(--ui-scale, 1))';
+
+  const rankProgressBlock = document.createElement('div');
+  rankProgressBlock.style.display = rankProgress ? 'flex' : 'none';
+  rankProgressBlock.style.flexDirection = 'column';
+  rankProgressBlock.style.gap = '6px';
+  rankProgressBlock.style.padding = '10px 12px';
+  rankProgressBlock.style.borderRadius = '12px';
+  rankProgressBlock.style.background = 'rgba(255,255,255,0.04)';
+  rankProgressBlock.style.border = '1px solid rgba(255,255,255,0.08)';
+
+  const nextRankText = document.createElement('div');
+  nextRankText.textContent = rankProgress
+    ? `Next: ${rankProgress.nextRank} (${rankProgress.nextScore} pts)`
+    : '';
+  nextRankText.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  nextRankText.style.opacity = '0.85';
+
+  const progressBar = document.createElement('div');
+  progressBar.style.height = '8px';
+  progressBar.style.borderRadius = '999px';
+  progressBar.style.background = 'rgba(255,255,255,0.12)';
+  progressBar.style.overflow = 'hidden';
+
+  const progressFill = document.createElement('div');
+  progressFill.style.height = '100%';
+  progressFill.style.width = rankProgress
+    ? `${Math.round(rankProgress.progress * 100)}%`
+    : '0%';
+  progressFill.style.background = 'linear-gradient(90deg, #fef08a, #f59e0b)';
+
+  progressBar.appendChild(progressFill);
+  rankProgressBlock.appendChild(nextRankText);
+  rankProgressBlock.appendChild(progressBar);
 
   const dailyEl = document.createElement('div');
   dailyEl.textContent = dailyInfo.text;
@@ -133,11 +177,48 @@ export function renderResult({
   actions.style.justifyContent = 'center';
 
   const replayButton = createButton('Replay', 'solid');
+  replayButton.style.boxShadow = '0 10px 24px rgba(56,189,248,0.2)';
+  replayButton.style.transition = 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease';
+  replayButton.addEventListener('mouseenter', () => {
+    replayButton.style.transform = 'translateY(-1px)';
+    replayButton.style.boxShadow = '0 14px 30px rgba(56,189,248,0.3)';
+    replayButton.style.filter = 'brightness(1.08)';
+  });
+  replayButton.addEventListener('mouseleave', () => {
+    replayButton.style.transform = 'translateY(0)';
+    replayButton.style.boxShadow = '0 10px 24px rgba(56,189,248,0.2)';
+    replayButton.style.filter = 'none';
+  });
+  replayButton.addEventListener('mousedown', () => {
+    replayButton.style.transform = 'translateY(1px)';
+    replayButton.style.boxShadow = '0 6px 16px rgba(56,189,248,0.2)';
+  });
+  replayButton.addEventListener('mouseup', () => {
+    replayButton.style.transform = 'translateY(-1px)';
+    replayButton.style.boxShadow = '0 14px 30px rgba(56,189,248,0.3)';
+  });
   replayButton.addEventListener('click', () => {
     if (typeof onReplay === 'function') onReplay();
   });
 
   const copyButton = createButton('Copy');
+  copyButton.style.transition = 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease';
+  copyButton.addEventListener('mouseenter', () => {
+    copyButton.style.transform = 'translateY(-1px)';
+    copyButton.style.boxShadow = '0 10px 22px rgba(255,255,255,0.15)';
+    copyButton.style.filter = 'brightness(1.05)';
+  });
+  copyButton.addEventListener('mouseleave', () => {
+    copyButton.style.transform = 'translateY(0)';
+    copyButton.style.boxShadow = 'none';
+    copyButton.style.filter = 'none';
+  });
+  copyButton.addEventListener('mousedown', () => {
+    copyButton.style.transform = 'translateY(1px)';
+  });
+  copyButton.addEventListener('mouseup', () => {
+    copyButton.style.transform = 'translateY(-1px)';
+  });
   copyButton.addEventListener('click', () => {
     if (typeof onCopy === 'function') onCopy();
   });
@@ -158,7 +239,62 @@ export function renderResult({
   if (isPersonalBest) container.appendChild(pbEl);
   container.appendChild(coinsEl);
   container.appendChild(dailyEl);
+  if (rankProgress) container.appendChild(rankProgressBlock);
+  if (nearMiss) container.appendChild(nearEl);
+
+  if (runStats) {
+    const statsBlock = document.createElement('div');
+    statsBlock.style.display = 'grid';
+    statsBlock.style.gridTemplateColumns = '1fr 1fr';
+    statsBlock.style.gap = '6px 14px';
+    statsBlock.style.justifyItems = 'center';
+    statsBlock.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+    statsBlock.style.opacity = '0.85';
+    statsBlock.innerHTML = `
+      <div>Total Pops</div><div>${runStats.pops ?? 0}</div>
+      <div>Best Combo</div><div>${runStats.maxCombo ?? 0}</div>
+      <div>Golden Hits</div><div>${runStats.goldenCount ?? 0}</div>
+      <div>Bomb Hits</div><div>${runStats.bombHits ?? 0}</div>
+    `;
+    container.appendChild(statsBlock);
+  }
+
+  if (achievementsUnlocked.length > 0) {
+    const achievementsBlock = document.createElement('div');
+    achievementsBlock.style.display = 'flex';
+    achievementsBlock.style.flexDirection = 'column';
+    achievementsBlock.style.gap = '6px';
+    achievementsBlock.style.padding = '10px 12px';
+    achievementsBlock.style.borderRadius = '12px';
+    achievementsBlock.style.background = 'rgba(255,255,255,0.04)';
+    achievementsBlock.style.border = '1px solid rgba(255,255,255,0.08)';
+
+    const title = document.createElement('div');
+    title.textContent = 'New Achievements';
+    title.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+    title.style.opacity = '0.85';
+    title.style.fontWeight = '600';
+
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '4px';
+    list.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+    list.style.opacity = '0.8';
+
+    const achievementMap = new Map(ACHIEVEMENTS.map((item) => [item.id, item.label]));
+    achievementsUnlocked.forEach((id) => {
+      const row = document.createElement('div');
+      row.textContent = achievementMap.get(id) || id;
+      list.appendChild(row);
+    });
+
+    achievementsBlock.appendChild(title);
+    achievementsBlock.appendChild(list);
+    container.appendChild(achievementsBlock);
+  }
   container.appendChild(claimRow);
   container.appendChild(actions);
   root.appendChild(container);
 }
+

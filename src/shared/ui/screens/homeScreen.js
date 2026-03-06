@@ -114,6 +114,8 @@ export function renderHome({
   onShop,
   onSettingsChange,
   onReset,
+  showTutorial = false,
+  onDismissTutorial,
 }) {
   const root = ensureRoot(rootEl);
   if (!root) return;
@@ -388,6 +390,71 @@ export function renderHome({
   container.appendChild(actionRow);
   container.appendChild(settingsPanel);
   root.appendChild(container);
+
+  if (showTutorial) {
+    const tutorialOverlay = document.createElement('div');
+    tutorialOverlay.style.position = 'absolute';
+    tutorialOverlay.style.inset = '0';
+    tutorialOverlay.style.display = 'flex';
+    tutorialOverlay.style.alignItems = 'center';
+    tutorialOverlay.style.justifyContent = 'center';
+    tutorialOverlay.style.background = 'rgba(6,10,22,0.7)';
+    tutorialOverlay.style.backdropFilter = 'blur(4px)';
+    tutorialOverlay.style.cursor = 'pointer';
+    tutorialOverlay.style.zIndex = '5';
+
+    const card = document.createElement('div');
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.gap = '12px';
+    card.style.padding = '22px 22px 18px';
+    card.style.borderRadius = '16px';
+    card.style.background = 'rgba(15,20,32,0.9)';
+    card.style.border = '1px solid rgba(255,255,255,0.12)';
+    card.style.boxShadow = '0 20px 50px rgba(0,0,0,0.5)';
+    card.style.maxWidth = '360px';
+    card.style.color = '#ffffff';
+
+    const title = document.createElement('div');
+    title.textContent = 'Quick Tips';
+    title.style.fontSize = 'calc(18px * var(--ui-scale, 1))';
+    title.style.fontWeight = '700';
+
+    const tipList = document.createElement('div');
+    tipList.style.display = 'flex';
+    tipList.style.flexDirection = 'column';
+    tipList.style.gap = '8px';
+    tipList.style.fontSize = 'calc(13px * var(--ui-scale, 1))';
+    tipList.style.opacity = '0.9';
+
+    const tips = [
+      'Pop bubbles fast to keep the timer calm.',
+      'Combos boost your score rapidly.',
+      'Special bubbles (fast, golden, bomb) have unique effects.',
+    ];
+
+    tips.forEach((text) => {
+      const row = document.createElement('div');
+      row.textContent = `• ${text}`;
+      tipList.appendChild(row);
+    });
+
+    const hint = document.createElement('div');
+    hint.textContent = 'Tap anywhere to start';
+    hint.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+    hint.style.opacity = '0.65';
+
+    card.appendChild(title);
+    card.appendChild(tipList);
+    card.appendChild(hint);
+    tutorialOverlay.appendChild(card);
+    tutorialOverlay.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (typeof onDismissTutorial === 'function') onDismissTutorial();
+    });
+
+    root.appendChild(tutorialOverlay);
+  }
 }
 
 function getSkinColor(id) {

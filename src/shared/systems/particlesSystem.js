@@ -1,5 +1,6 @@
 const DEFAULT_MAX_PARTICLES = 30;
-const DEFAULT_LIFE = 0.6;
+const MIN_LIFE = 0.35;
+const MAX_LIFE = 0.45;
 
 function randomRange(min, max, rng) {
   return min + rng() * (max - min);
@@ -13,12 +14,14 @@ export function emitPopParticles(particles, x, y, intensity = 6, maxParticles = 
   for (let i = 0; i < count; i += 1) {
     const angle = rng() * Math.PI * 2;
     const speed = randomRange(40, 140, rng);
+    const life = randomRange(MIN_LIFE, MAX_LIFE, rng);
     next.push({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      life: randomRange(DEFAULT_LIFE * 0.6, DEFAULT_LIFE * 1.2, rng),
+      life,
+      maxLife: life,
     });
   }
 
@@ -27,6 +30,11 @@ export function emitPopParticles(particles, x, y, intensity = 6, maxParticles = 
   }
 
   return next;
+}
+
+export function emitPopBurst(particles, x, y, maxParticles = DEFAULT_MAX_PARTICLES, rng = Math.random) {
+  const count = 6 + Math.floor(rng() * 5);
+  return emitPopParticles(particles, x, y, count, maxParticles, rng);
 }
 
 export function updateParticles(particles, deltaTimeMs) {

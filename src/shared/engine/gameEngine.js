@@ -5,7 +5,8 @@ import { popBubbleAt } from '../systems/collisionSystem.js';
 import { applyScore } from '../systems/scoreSystem.js';
 import { applyCombo } from '../systems/comboSystem.js';
 import { applyStress } from '../systems/stressSystem.js';
-import { emitPopParticles, updateParticles } from '../systems/particlesSystem.js';
+import { emitPopBurst, updateParticles } from '../systems/particlesSystem.js';
+import { emitFloatingText, updateFloatingTexts } from '../systems/floatingTextSystem.js';
 import { setupHiDPICanvas } from '../render/canvasScale.js';
 
 const STATES = {
@@ -51,6 +52,7 @@ function createInitialState(config, modeOverride) {
     stress: 0,
     bubbles: [],
     particles: [],
+    floatingTexts: [],
     spawnTimer: 0,
     timeLeftMs: durationMs,
     totalDurationMs: durationMs,
@@ -83,6 +85,7 @@ function applyState(target, nextState) {
   if (nextState.stress !== undefined) target.stress = nextState.stress;
   if (nextState.bubbles !== undefined) target.bubbles = nextState.bubbles;
   if (nextState.particles !== undefined) target.particles = nextState.particles;
+  if (nextState.floatingTexts !== undefined) target.floatingTexts = nextState.floatingTexts;
   if (nextState.spawnTimer !== undefined) target.spawnTimer = nextState.spawnTimer;
   if (nextState.timeLeftMs !== undefined) target.timeLeftMs = nextState.timeLeftMs;
   if (nextState.totalDurationMs !== undefined) target.totalDurationMs = nextState.totalDurationMs;
@@ -222,6 +225,7 @@ export function createGameEngine(options = {}) {
     engine.stress = base.stress;
     engine.bubbles = base.bubbles;
     engine.particles = base.particles;
+    engine.floatingTexts = base.floatingTexts;
     engine.spawnTimer = base.spawnTimer;
     engine.timeLeftMs = base.timeLeftMs;
     engine.totalDurationMs = base.totalDurationMs;
@@ -273,6 +277,7 @@ export function createGameEngine(options = {}) {
     next = updateComboTimer(next, deltaMs);
 
     next = { ...next, particles: updateParticles(next.particles, deltaMs) };
+    next = { ...next, floatingTexts: updateFloatingTexts(next.floatingTexts, deltaMs) };
 
     if (Number.isFinite(next.timeLeftMs)) {
       next = { ...next, timeLeftMs: Math.max(0, next.timeLeftMs - deltaMs) };
@@ -401,6 +406,8 @@ export function createGameEngine(options = {}) {
     let next = { ...engine, bubbles: hit.bubbles };
     const isBomb = hit.popped.type === 'bomb';
 
+    let awardedText = '-150';
+
     if (isBomb) {
       next = applyCombo(next, { type: 'bomb' }, config);
       next = applyStress(next, { type: 'bomb' }, config);
@@ -415,6 +422,10 @@ export function createGameEngine(options = {}) {
     } else {
       next = applyCombo(next, { type: 'hit' }, config);
       const multiplier = next.combo?.multiplier ?? 1;
+      const basePoints =
+        hit.popped.type === 'fast' ? 20 : hit.popped.type === 'golden' ? 100 : 10;
+      const awarded = basePoints * multiplier;
+      awardedText = `+${awarded}`;
       next = applyScore(next, {
         type: 'pop',
         bubbleType: hit.popped.type,
@@ -438,16 +449,24 @@ export function createGameEngine(options = {}) {
 
     const maxParticles =
       typeof config.maxParticles === 'number' ? config.maxParticles : 30;
-    const intensity = hit.popped.type === 'golden' ? 12 : 6;
+    const maxFloatingTexts =
+      typeof config.maxFloatingTexts === 'number' ? config.maxFloatingTexts : 24;
     next = {
       ...next,
-      particles: emitPopParticles(
+      particles: emitPopBurst(
         next.particles,
         hit.popped.x,
         hit.popped.y,
-        intensity,
         maxParticles,
         rng
+      ),
+      floatingTexts: emitFloatingText(
+        next.floatingTexts,
+        hit.popped.x,
+        hit.popped.y,
+        awardedText,
+        rng,
+        maxFloatingTexts
       ),
     };
 

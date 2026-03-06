@@ -8,12 +8,15 @@ import {
   loadCoins,
   loadStreak,
   loadDaily,
+  loadAchievements,
   save,
   saveBestScore,
+  saveAchievements,
 } from '../shared/storage/storage.js';
 import { getTodayKey, getDailyChallenge, evaluateDailyProgress } from '../shared/systems/dailySystem.js';
 import { updateStreak } from '../shared/systems/streakSystem.js';
 import { coinsForRun } from '../shared/systems/coinSystem.js';
+import { evaluateAchievements } from '../shared/systems/achievementSystem.js';
 import { setupHiDPICanvas } from '../shared/render/canvasScale.js';
 
 const CONFIG = {
@@ -104,11 +107,12 @@ function computeRank(score) {
 }
 
 async function loadModel() {
-  const [bestScores, coins, streak, daily] = await Promise.all([
+  const [bestScores, coins, streak, daily, achievements] = await Promise.all([
     loadBestScores(),
     loadCoins(),
     loadStreak(),
     loadDaily(),
+    loadAchievements(),
   ]);
 
   const todayKey = getTodayKey();
@@ -122,6 +126,7 @@ async function loadModel() {
     coins,
     streak,
     daily: dailyData,
+    achievements: Array.isArray(achievements) ? achievements : [],
   };
 }
 
@@ -177,6 +182,11 @@ async function setup() {
 
     const todayKey = getTodayKey();
     model.streak = updateStreak(model.streak, todayKey, true);
+    const streakReward = Number(model.streak?.rewardCoins) || 0;
+    if (streakReward > 0) {
+      model.coins += streakReward;
+      model.streak.rewardCoins = 0;
+    }
 
     model.daily = evaluateDailyProgress(model.daily, runStats);
     if (model.daily.completed && !model.daily.rewardClaimed) {
@@ -186,12 +196,16 @@ async function setup() {
 
     model.bestScores = await saveBestScore(runStats.mode, runStats.score);
 
+    const achievementResult = evaluateAchievements(model.achievements, runStats);
+    model.achievements = achievementResult.unlocked;
+
     await save({
       coins: model.coins,
       streak: model.streak,
       daily: model.daily,
       bestScores: model.bestScores,
     });
+    await saveAchievements(model.achievements);
 
     showResult({
       score: runStats.score,
@@ -199,6 +213,7 @@ async function setup() {
       nearMiss: rankInfo.nearMiss,
       coinsEarned,
       mode: runStats.mode,
+      achievementsUnlocked: achievementResult.newlyUnlocked,
     });
   }
 

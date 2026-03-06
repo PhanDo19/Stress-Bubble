@@ -5,6 +5,8 @@
   'daily',
   'shop',
   'settings',
+  'tutorial',
+  'achievements',
 ];
 
 function hasChromeStorage() {
@@ -160,4 +162,22 @@ export async function loadSettings() {
 
 export async function saveSettings(settingsObj) {
   await save({ settings: settingsObj });
+}
+
+export async function loadTutorial() {
+  const data = await load('tutorial');
+  return !!data.tutorial;
+}
+
+export async function saveTutorial(seen) {
+  await save({ tutorial: !!seen });
+}
+
+export async function loadAchievements() {
+  const data = await load('achievements');
+  return Array.isArray(data.achievements) ? data.achievements : [];
+}
+
+export async function saveAchievements(achievements) {
+  await save({ achievements: Array.isArray(achievements) ? achievements : [] });
 }

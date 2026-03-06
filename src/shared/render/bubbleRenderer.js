@@ -84,6 +84,13 @@ export function renderBubbles(ctx, bubbles, skinId = 'skin_classic') {
     ctx.lineWidth = Math.max(1, r * 0.08);
     ctx.stroke();
 
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath();
+    ctx.arc(bubble.x - r * 0.35, bubble.y - r * 0.35, Math.max(2, r * 0.28), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
     if (bubble.type === 'bomb') {
       drawBombMark(ctx, bubble.x, bubble.y, r);
     }
