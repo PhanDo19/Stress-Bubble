@@ -7,8 +7,5 @@
     "default_title": "Stress Bubble",
     "default_popup": "src/popup/popup.html"
   },
-  "chrome_url_overrides": {
-    "newtab": "src/newtab/newtab.html"
-  },
   "permissions": ["storage"]
 }

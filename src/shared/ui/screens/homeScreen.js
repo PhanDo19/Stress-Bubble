@@ -1,4 +1,6 @@
-﻿import { getCatalog } from '../shopSystem.js';
+﻿import { renderSkinPreview } from '../../render/renderer.js';
+import { getCatalog, getSkinById } from '../shopSystem.js';
+import { t } from '../i18n.js';
 
 function ensureRoot(rootEl) {
   if (!rootEl) return null;
@@ -9,7 +11,7 @@ function ensureRoot(rootEl) {
 function formatChallenge(daily) {
   if (!daily || !daily.challenge) {
     return {
-      label: 'Daily: -',
+      label: t('daily.none'),
       progress: 0,
       target: 1,
       completed: false,
@@ -18,20 +20,20 @@ function formatChallenge(daily) {
 
   const c = daily.challenge;
   const completed = !!daily.completed;
-  let label = 'Daily: -';
+  let label = t('daily.none');
   let target = Number(c.target) || 1;
   let progress = Number(daily.progress) || 0;
 
-  if (c.type === 'popCount') label = `Daily: POP ${c.target}`;
-  if (c.type === 'maxCombo') label = `Daily: COMBO x${c.target}`;
+  if (c.type === 'popCount') label = t('daily.pop_count', { target: c.target });
+  if (c.type === 'maxCombo') label = t('daily.max_combo', { target: c.target });
   if (c.type === 'noBomb') {
-    label = 'Daily: NO BOMB';
+    label = t('daily.no_bomb');
     target = 1;
     progress = completed ? 1 : 0;
   }
-  if (c.type === 'score') label = `Daily: SCORE ${c.target}`;
-  if (c.type === 'missMax') label = `Daily: MISS <= ${c.target}`;
-  if (c.type === 'goldenCount') label = `Daily: GOLDEN ${c.target}`;
+  if (c.type === 'score') label = t('daily.score', { target: c.target });
+  if (c.type === 'missMax') label = t('daily.miss_max', { target: c.target });
+  if (c.type === 'goldenCount') label = t('daily.golden_count', { target: c.target });
 
   return { label, progress, target, completed };
 }
@@ -111,6 +113,8 @@ export function renderHome({
   settings,
   onModeChange,
   onPlay,
+  onOpenFullscreen,
+  onMinimize,
   onShop,
   onSettingsChange,
   onReset,
@@ -153,13 +157,13 @@ export function renderHome({
   header.style.gap = '6px';
 
   const title = document.createElement('div');
-  title.textContent = 'Stress Bubble';
+  title.textContent = t('app.title');
   title.style.fontSize = 'calc(28px * var(--ui-scale, 1))';
   title.style.fontWeight = '700';
   title.style.letterSpacing = '0.6px';
 
   const subtitle = document.createElement('div');
-  subtitle.textContent = 'New tab calm, one pop at a time';
+  subtitle.textContent = t('app.subtitle');
   subtitle.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
   subtitle.style.opacity = '0.65';
 
@@ -172,9 +176,9 @@ export function renderHome({
   modeRow.style.justifyContent = 'center';
 
   const modes = [
-    { key: 'classic', label: 'Classic' },
-    { key: 'rage', label: 'Rage' },
-    { key: 'zen', label: 'Zen' },
+    { key: 'classic', label: t('mode.classic') },
+    { key: 'rage', label: t('mode.rage') },
+    { key: 'zen', label: t('mode.zen') },
   ];
 
   modes.forEach((mode) => {
@@ -194,9 +198,9 @@ export function renderHome({
   stats.style.fontSize = 'calc(14px * var(--ui-scale, 1))';
   stats.style.padding = '10px 0';
   stats.innerHTML = `
-    <div>Best (${selectedMode})</div><div>${bestScore}</div>
-    <div>Coins</div><div>${coins}</div>
-    <div>Streak</div><div>${streak}</div>
+    <div>${t('stats.best_mode', { mode: selectedMode })}</div><div>${bestScore}</div>
+    <div>${t('stats.coins')}</div><div>${coins}</div>
+    <div>${t('stats.streak')}</div><div>${streak}</div>
   `;
 
   const dailyBlock = document.createElement('div');
@@ -235,20 +239,36 @@ export function renderHome({
   actionRow.style.gap = '10px';
   actionRow.style.justifyContent = 'center';
 
-  const playButton = createButton('Play', true, 'solid');
+  const playButton = createButton(t('action.play'), true, 'solid');
   playButton.style.fontSize = 'calc(15px * var(--ui-scale, 1))';
   playButton.addEventListener('click', () => {
     if (typeof onPlay === 'function') onPlay();
   });
 
-  const shopButton = createButton('Shop');
+  const secondaryButtonLabel =
+    typeof onOpenFullscreen === 'function'
+      ? t('action.open_fullscreen')
+      : t('action.minimize');
+  const secondaryButton = createButton(secondaryButtonLabel);
+  secondaryButton.addEventListener('click', () => {
+    if (typeof onOpenFullscreen === 'function') {
+      onOpenFullscreen();
+      return;
+    }
+    if (typeof onMinimize === 'function') onMinimize();
+  });
+
+  const shopButton = createButton(t('action.shop'));
   shopButton.addEventListener('click', () => {
     if (typeof onShop === 'function') onShop();
   });
 
-  const settingsButton = createButton('Settings');
+  const settingsButton = createButton(t('action.settings'));
 
   actionRow.appendChild(playButton);
+  if (typeof onOpenFullscreen === 'function' || typeof onMinimize === 'function') {
+    actionRow.appendChild(secondaryButton);
+  }
   actionRow.appendChild(shopButton);
   actionRow.appendChild(settingsButton);
 
@@ -262,9 +282,22 @@ export function renderHome({
   togglesRow.style.gap = '8px';
   togglesRow.style.justifyContent = 'center';
 
-  const sfxButton = createButton(`SFX ${settings?.sfx ? 'On' : 'Off'}`, settings?.sfx);
-  const musicButton = createButton(`Music ${settings?.music ? 'On' : 'Off'}`, settings?.music);
-  const vibeButton = createButton(`Vibe ${settings?.vibe ? 'On' : 'Off'}`, settings?.vibe);
+  const sfxButton = createButton(
+    `${t('settings.sfx')} ${settings?.sfx ? t('common.on') : t('common.off')}`,
+    settings?.sfx
+  );
+  const musicButton = createButton(
+    `${t('settings.music')} ${settings?.music ? t('common.on') : t('common.off')}`,
+    settings?.music
+  );
+  const vibeButton = createButton(
+    `${t('settings.vibe')} ${settings?.vibe ? t('common.on') : t('common.off')}`,
+    settings?.vibe
+  );
+  const muteButton = createButton(
+    `${t('settings.mute')} ${settings?.muteAudio ? t('common.on') : t('common.off')}`,
+    settings?.muteAudio
+  );
 
   sfxButton.addEventListener('click', () => {
     if (typeof onSettingsChange === 'function') onSettingsChange({ sfx: !settings?.sfx });
@@ -275,10 +308,45 @@ export function renderHome({
   vibeButton.addEventListener('click', () => {
     if (typeof onSettingsChange === 'function') onSettingsChange({ vibe: !settings?.vibe });
   });
+  muteButton.addEventListener('click', () => {
+    if (typeof onSettingsChange === 'function') {
+      onSettingsChange({ muteAudio: !settings?.muteAudio });
+    }
+  });
 
   togglesRow.appendChild(sfxButton);
   togglesRow.appendChild(musicButton);
   togglesRow.appendChild(vibeButton);
+  togglesRow.appendChild(muteButton);
+
+  const accessibilityRow = document.createElement('div');
+  accessibilityRow.style.display = 'flex';
+  accessibilityRow.style.gap = '8px';
+  accessibilityRow.style.justifyContent = 'center';
+
+  const reducedMotionButton = createButton(
+    `${t('settings.reduced_motion')} ${settings?.reducedMotion ? t('common.on') : t('common.off')}`,
+    settings?.reducedMotion
+  );
+  const contrastButton = createButton(
+    `${t('settings.high_contrast')} ${settings?.highContrast ? t('common.on') : t('common.off')}`,
+    settings?.highContrast
+  );
+
+  reducedMotionButton.addEventListener('click', () => {
+    if (typeof onSettingsChange === 'function') {
+      onSettingsChange({ reducedMotion: !settings?.reducedMotion });
+    }
+  });
+  contrastButton.addEventListener('click', () => {
+    if (typeof onSettingsChange === 'function') {
+      onSettingsChange({ highContrast: !settings?.highContrast });
+    }
+  });
+
+  accessibilityRow.appendChild(reducedMotionButton);
+  accessibilityRow.appendChild(contrastButton);
+
 
   const difficultyBlock = document.createElement('div');
   difficultyBlock.style.display = 'flex';
@@ -286,7 +354,7 @@ export function renderHome({
   difficultyBlock.style.gap = '8px';
 
   const difficultyLabel = document.createElement('div');
-  difficultyLabel.textContent = 'Difficulty';
+  difficultyLabel.textContent = t('settings.difficulty');
   difficultyLabel.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
   difficultyLabel.style.opacity = '0.75';
 
@@ -296,9 +364,9 @@ export function renderHome({
   difficultyRow.style.justifyContent = 'center';
 
   const difficulties = [
-    { key: 'easy', label: 'Easy' },
-    { key: 'normal', label: 'Normal' },
-    { key: 'hard', label: 'Hard' },
+    { key: 'easy', label: t('difficulty.easy') },
+    { key: 'normal', label: t('difficulty.normal') },
+    { key: 'hard', label: t('difficulty.hard') },
   ];
 
   difficulties.forEach((diff) => {
@@ -318,7 +386,7 @@ export function renderHome({
   musicStyleBlock.style.gap = '8px';
 
   const musicStyleLabel = document.createElement('div');
-  musicStyleLabel.textContent = 'Music Style';
+  musicStyleLabel.textContent = t('settings.music_style');
   musicStyleLabel.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
   musicStyleLabel.style.opacity = '0.75';
 
@@ -328,9 +396,9 @@ export function renderHome({
   musicStyleRow.style.justifyContent = 'center';
 
   const styles = [
-    { key: 'chill', label: 'Chill' },
-    { key: 'hiphop', label: 'HipHop' },
-    { key: 'minimal', label: 'Minimal' },
+    { key: 'chill', label: t('music_style.chill') },
+    { key: 'hiphop', label: t('music_style.hiphop') },
+    { key: 'minimal', label: t('music_style.minimal') },
   ];
 
   styles.forEach((style) => {
@@ -348,7 +416,7 @@ export function renderHome({
   resetRow.style.display = 'flex';
   resetRow.style.justifyContent = 'center';
 
-  const resetButton = createButton('Reset Data', false, 'danger');
+  const resetButton = createButton(t('settings.reset_data'), false, 'danger');
   resetButton.addEventListener('click', () => {
     if (typeof onReset === 'function') onReset();
   });
@@ -363,16 +431,17 @@ export function renderHome({
   volumeBlock.style.gap = '8px';
   volumeBlock.style.alignItems = 'center';
 
-  const sfxSlider = createSlider('SFX Vol', settings?.sfxVolume ?? 0.8, (value) => {
+  const sfxSlider = createSlider(t('settings.sfx_volume'), settings?.sfxVolume ?? 0.8, (value) => {
     if (typeof onSettingsChange === 'function') onSettingsChange({ sfxVolume: value });
   });
-  const musicSlider = createSlider('Music Vol', settings?.musicVolume ?? 0.4, (value) => {
+  const musicSlider = createSlider(t('settings.music_volume'), settings?.musicVolume ?? 0.4, (value) => {
     if (typeof onSettingsChange === 'function') onSettingsChange({ musicVolume: value });
   });
 
   volumeBlock.appendChild(sfxSlider);
   volumeBlock.appendChild(musicSlider);
   settingsPanel.appendChild(volumeBlock);
+  settingsPanel.appendChild(accessibilityRow);
   settingsPanel.appendChild(difficultyBlock);
   settingsPanel.appendChild(musicStyleBlock);
   settingsPanel.appendChild(resetRow);
@@ -416,7 +485,7 @@ export function renderHome({
     card.style.color = '#ffffff';
 
     const title = document.createElement('div');
-    title.textContent = 'Quick Tips';
+    title.textContent = t('tutorial.quick_tips');
     title.style.fontSize = 'calc(18px * var(--ui-scale, 1))';
     title.style.fontWeight = '700';
 
@@ -427,11 +496,7 @@ export function renderHome({
     tipList.style.fontSize = 'calc(13px * var(--ui-scale, 1))';
     tipList.style.opacity = '0.9';
 
-    const tips = [
-      'Pop bubbles fast to keep the timer calm.',
-      'Combos boost your score rapidly.',
-      'Special bubbles (fast, golden, bomb) have unique effects.',
-    ];
+    const tips = [t('tutorial.tip_1'), t('tutorial.tip_2'), t('tutorial.tip_3')];
 
     tips.forEach((text) => {
       const row = document.createElement('div');
@@ -440,7 +505,7 @@ export function renderHome({
     });
 
     const hint = document.createElement('div');
-    hint.textContent = 'Tap anywhere to start';
+    hint.textContent = t('tutorial.tap_anywhere');
     hint.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
     hint.style.opacity = '0.65';
 
@@ -471,6 +536,7 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
   const coins = Number(model?.coins) || 0;
   const ownedSkins = Array.isArray(model?.ownedSkins) ? model.ownedSkins : ['skin_classic'];
   const selectedSkin = model?.selectedSkin || 'skin_classic';
+  let previewSkin = selectedSkin;
 
   const container = document.createElement('div');
   container.style.display = 'flex';
@@ -489,14 +555,58 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
   container.style.backdropFilter = 'blur(10px)';
 
   const title = document.createElement('div');
-  title.textContent = 'Shop';
+  title.textContent = t('shop.title');
   title.style.fontSize = 'calc(24px * var(--ui-scale, 1))';
   title.style.fontWeight = '700';
 
   const coinsEl = document.createElement('div');
-  coinsEl.textContent = `Coins: ${coins}`;
+  coinsEl.textContent = `${t('stats.coins')}: ${coins}`;
   coinsEl.style.fontSize = 'calc(13px * var(--ui-scale, 1))';
   coinsEl.style.opacity = '0.85';
+
+  const previewWrap = document.createElement('div');
+  previewWrap.style.padding = '10px';
+  previewWrap.style.borderRadius = '14px';
+  previewWrap.style.background = 'rgba(255,255,255,0.04)';
+  previewWrap.style.border = '1px solid rgba(255,255,255,0.08)';
+
+  const previewLabel = document.createElement('div');
+  previewLabel.textContent = t('shop.gameplay_preview');
+  previewLabel.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  previewLabel.style.opacity = '0.75';
+  previewLabel.style.marginBottom = '8px';
+
+  const previewCanvas = document.createElement('canvas');
+  previewCanvas.style.width = '100%';
+  previewCanvas.style.height = '140px';
+  previewCanvas.style.borderRadius = '10px';
+  previewCanvas.style.display = 'block';
+
+  const previewCtx = previewCanvas.getContext('2d');
+  previewWrap.appendChild(previewLabel);
+  previewWrap.appendChild(previewCanvas);
+
+  function drawPreview() {
+    if (!previewCtx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.max(280, Math.floor(previewCanvas.clientWidth * dpr));
+    const height = Math.max(120, Math.floor(previewCanvas.clientHeight * dpr));
+    if (previewCanvas.width !== width || previewCanvas.height !== height) {
+      previewCanvas.width = width;
+      previewCanvas.height = height;
+    }
+    renderSkinPreview(previewCtx, previewCanvas, previewSkin);
+  }
+
+  function startPreviewLoop() {
+    if (!previewCtx) return;
+    const tick = () => {
+      if (!root.contains(container)) return;
+      drawPreview();
+      window.requestAnimationFrame(tick);
+    };
+    window.requestAnimationFrame(tick);
+  }
 
   const list = document.createElement('div');
   list.style.display = 'flex';
@@ -527,7 +637,7 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
     name.style.textAlign = 'left';
 
     const price = document.createElement('div');
-    price.textContent = item.price === 0 ? 'Free' : `${item.price}`;
+    price.textContent = item.price === 0 ? t('common.free') : `${item.price}`;
     price.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
     price.style.opacity = '0.7';
 
@@ -541,9 +651,9 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
     const owned = ownedSkins.includes(item.id);
     const equipped = selectedSkin === item.id;
 
-    let label = 'Buy';
-    if (equipped) label = 'Equipped';
-    else if (owned) label = 'Equip';
+    let label = t('action.buy');
+    if (equipped) label = t('action.equipped');
+    else if (owned) label = t('action.equip');
 
     const button = createButton(label, equipped, equipped ? 'solid' : 'ghost');
     const canBuy = owned || coins >= item.price;
@@ -557,17 +667,33 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
       if (typeof onBuy === 'function') onBuy(item.id);
     });
 
+    row.addEventListener('mouseenter', () => {
+      if (!getSkinById(item.id)) return;
+      previewSkin = item.id;
+      drawPreview();
+    });
+    row.addEventListener('focusin', () => {
+      if (!getSkinById(item.id)) return;
+      previewSkin = item.id;
+      drawPreview();
+    });
+
     row.appendChild(swatch);
     row.appendChild(info);
     row.appendChild(button);
     list.appendChild(row);
   });
 
+  list.addEventListener('mouseleave', () => {
+    previewSkin = selectedSkin;
+    drawPreview();
+  });
+
   const actions = document.createElement('div');
   actions.style.display = 'flex';
   actions.style.justifyContent = 'center';
 
-  const backButton = createButton('Back');
+  const backButton = createButton(t('action.back'));
   backButton.addEventListener('click', () => {
     if (typeof onBack === 'function') onBack();
   });
@@ -576,7 +702,15 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
 
   container.appendChild(title);
   container.appendChild(coinsEl);
+  container.appendChild(previewWrap);
   container.appendChild(list);
   container.appendChild(actions);
   root.appendChild(container);
+  drawPreview();
+  startPreviewLoop();
 }
+
+
+
+
+

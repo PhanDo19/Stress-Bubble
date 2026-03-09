@@ -98,3 +98,17 @@ export function renderBubbles(ctx, bubbles, skinId = 'skin_classic') {
     ctx.restore();
   }
 }
+
+export function createSkinPreviewBubbles(width, height, timeMs = 0) {
+  const w = Math.max(220, Number(width) || 320);
+  const h = Math.max(120, Number(height) || 140);
+  const t = Number(timeMs) || 0;
+  const bob = (offset) => Math.sin((t + offset) / 360) * 2.5;
+
+  return [
+    { type: 'normal', x: w * 0.2, y: h * 0.58 + bob(0), radius: 16 },
+    { type: 'fast', x: w * 0.4, y: h * 0.42 + bob(120), radius: 14 },
+    { type: 'golden', x: w * 0.62, y: h * 0.56 + bob(240), radius: 18 },
+    { type: 'bomb', x: w * 0.8, y: h * 0.4 + bob(360), radius: 16 },
+  ];
+}

@@ -242,6 +242,8 @@ Complexity: MEDIUM
 
 Expand the challenge pool.
 
+Status: Completed (2026-03-06)
+
 Examples:
 
 - reach combo X
@@ -270,6 +272,8 @@ Improve player experience and feedback.
 
 Add subtle animations:
 
+Status: Completed (2026-03-06)
+
 - score tick animation
 - combo meter animation
 - smoother combo pulses
@@ -288,6 +292,8 @@ Complexity: LOW
 
 Allow preview of skins in gameplay visuals.
 
+Status: Completed (2026-03-09)
+
 Files:
 
 
@@ -303,6 +309,8 @@ Complexity: MEDIUM
 ## 9. Audio Improvements
 
 Expand sound palette.
+
+Status: Completed (2026-03-09)
 
 Add:
 
@@ -331,6 +339,8 @@ Make the extension production-ready.
 
 Implement adaptive detail.
 
+Status: Completed (2026-03-09)
+
 Example:
 
 
@@ -353,6 +363,8 @@ Complexity: MEDIUM
 
 Add options such as:
 
+Status: Completed (2026-03-09)
+
 - reduced motion
 - color contrast
 - mute audio
@@ -371,6 +383,8 @@ Complexity: MEDIUM
 ## 12. Localization Scaffold
 
 Prepare UI text for translation.
+
+Status: Completed (2026-03-09)
 
 Approach:
 

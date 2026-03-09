@@ -1,15 +1,21 @@
 const CHALLENGE_POOL = [
   { id: 'pop_80', type: 'popCount', target: 80 },
   { id: 'pop_120', type: 'popCount', target: 120 },
+  { id: 'pop_160', type: 'popCount', target: 160 },
   { id: 'combo_6', type: 'maxCombo', target: 6 },
   { id: 'combo_8', type: 'maxCombo', target: 8 },
+  { id: 'combo_10', type: 'maxCombo', target: 10 },
   { id: 'no_bomb', type: 'noBomb', target: 0 },
   { id: 'score_1800', type: 'score', target: 1800 },
   { id: 'score_2600', type: 'score', target: 2600 },
+  { id: 'score_3200', type: 'score', target: 3200 },
   { id: 'miss_5', type: 'missMax', target: 5 },
   { id: 'miss_8', type: 'missMax', target: 8 },
+  { id: 'miss_3', type: 'missMax', target: 3 },
   { id: 'golden_2', type: 'goldenCount', target: 2 },
   { id: 'golden_3', type: 'goldenCount', target: 3 },
+  { id: 'golden_4', type: 'goldenCount', target: 4 },
+  { id: 'golden_5', type: 'goldenCount', target: 5 },
 ];
 
 export function getTodayKey() {

@@ -9,6 +9,10 @@ export function getCatalog() {
   return CATALOG.slice();
 }
 
+export function getSkinById(itemId) {
+  return CATALOG.find((entry) => entry.id === itemId) || null;
+}
+
 function ensureShop(model) {
   const owned = Array.isArray(model?.ownedSkins) ? model.ownedSkins.slice() : ['skin_classic'];
   const selectedSkin = model?.selectedSkin || 'skin_classic';

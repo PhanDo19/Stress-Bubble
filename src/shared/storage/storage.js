@@ -157,7 +157,14 @@ export async function saveShop(shopObj) {
 
 export async function loadSettings() {
   const data = await load('settings');
-  return data.settings || null;
+  const settings = data.settings || null;
+  if (!settings) return null;
+  return {
+    ...settings,
+    muteAudio: !!settings.muteAudio,
+    reducedMotion: !!settings.reducedMotion,
+    highContrast: !!settings.highContrast,
+  };
 }
 
 export async function saveSettings(settingsObj) {

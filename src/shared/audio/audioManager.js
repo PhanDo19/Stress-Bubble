@@ -1,10 +1,13 @@
 ﻿export function createAudioManager() {
   let ctx = null;
   let musicTimer = null;
+  let lastComboAccentMs = 0;
+  let lastLowTimeCueMs = 0;
   let settings = {
     sfx: true,
     music: true,
     vibe: false,
+    muteAudio: false,
     sfxVolume: 0.8,
     musicVolume: 0.4,
     musicStyle: 'chill',
@@ -29,7 +32,7 @@
   }
 
   function playTone({ frequency, duration = 0.12, gain = 0.12, type = 'sine' }) {
-    if (!settings.sfx) return;
+    if (settings.muteAudio || !settings.sfx) return;
     const audio = ensureContext();
     if (!audio) return;
 
@@ -59,28 +62,42 @@
     }
   }
 
-  function playPop(type) {
+  function playPop(type, comboMultiplier = 1) {
+    const combo = Math.max(1, Number(comboMultiplier) || 1);
     if (type === 'bomb') {
       playTone({ frequency: 140, duration: 0.18, gain: 0.18, type: 'sawtooth' });
       vibrate(30);
       return;
     }
     if (type === 'golden') {
-      playTone({ frequency: 820, duration: 0.16, gain: 0.14, type: 'triangle' });
+      playTone({ frequency: 760, duration: 0.12, gain: 0.14, type: 'triangle' });
+      playTone({ frequency: 1140, duration: 0.18, gain: 0.11, type: 'sine' });
       vibrate(20);
-      return;
-    }
-    if (type === 'fast') {
+    } else if (type === 'fast') {
       playTone({ frequency: 560, duration: 0.12, gain: 0.12, type: 'triangle' });
       vibrate(12);
-      return;
+    } else {
+      playTone({ frequency: 420, duration: 0.12, gain: 0.1, type: 'sine' });
+      vibrate(10);
     }
-    playTone({ frequency: 420, duration: 0.12, gain: 0.1, type: 'sine' });
-    vibrate(10);
+
+    if (combo >= 4) {
+      const nowMs = Date.now();
+      const minGapMs = combo >= 8 ? 80 : 120;
+      if (nowMs - lastComboAccentMs >= minGapMs) {
+        lastComboAccentMs = nowMs;
+        playTone({
+          frequency: combo >= 8 ? 1040 : 900,
+          duration: combo >= 8 ? 0.12 : 0.1,
+          gain: combo >= 8 ? 0.1 : 0.08,
+          type: combo >= 8 ? 'sawtooth' : 'triangle',
+        });
+      }
+    }
   }
 
   function playMiss(count = 1) {
-    if (!settings.sfx) return;
+    if (settings.muteAudio || !settings.sfx) return;
     const base = 180;
     for (let i = 0; i < Math.min(3, count); i += 1) {
       const offset = i * 0.05;
@@ -110,7 +127,7 @@
   }
 
   function startMusic() {
-    if (!settings.music) return;
+    if (settings.muteAudio || !settings.music) return;
     const audio = ensureContext();
     if (!audio || musicTimer) return;
 
@@ -197,7 +214,7 @@
   function setSettings(next) {
     const prevStyle = settings.musicStyle;
     settings = { ...settings, ...(next || {}) };
-    if (!settings.music) {
+    if (settings.muteAudio || !settings.music) {
       stopMusic();
       return;
     }
@@ -209,11 +226,20 @@
 
   function unlock() {
     ensureContext();
-    if (settings.music) startMusic();
+    if (!settings.muteAudio && settings.music) startMusic();
   }
 
   function stopAll() {
     stopMusic();
+  }
+  function playLowTimeWarning() {
+    if (!settings.sfx) return;
+    const nowMs = Date.now();
+    if (nowMs - lastLowTimeCueMs < 2500) return;
+    lastLowTimeCueMs = nowMs;
+    playTone({ frequency: 660, duration: 0.12, gain: 0.14, type: 'square' });
+    playTone({ frequency: 520, duration: 0.16, gain: 0.11, type: 'triangle' });
+    vibrate(18);
   }
 
   return {
@@ -221,6 +247,8 @@
     unlock,
     playPop,
     playMiss,
+    playLowTimeWarning,
     stopAll,
   };
 }
+

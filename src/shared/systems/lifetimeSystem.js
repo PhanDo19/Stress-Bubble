@@ -1,10 +1,11 @@
 export function updateLifetime(bubbles, deltaTimeMs, canvasHeight) {
   if (!Array.isArray(bubbles) || bubbles.length === 0) {
-    return { bubbles: [], missedCount: 0 };
+    return { bubbles: [], missedCount: 0, skippedBombCount: 0 };
   }
 
   const dt = Number.isFinite(deltaTimeMs) ? deltaTimeMs / 1000 : 0;
   let missedCount = 0;
+  let skippedBombCount = 0;
 
   const next = [];
   for (const bubble of bubbles) {
@@ -14,7 +15,8 @@ export function updateLifetime(bubbles, deltaTimeMs, canvasHeight) {
       : bubble.y + bubble.radius < 0;
 
     if (nextLifetime <= 0 || offTop) {
-      missedCount += 1;
+      if (bubble.type === 'bomb') skippedBombCount += 1;
+      else missedCount += 1;
       continue;
     }
 
@@ -24,5 +26,5 @@ export function updateLifetime(bubbles, deltaTimeMs, canvasHeight) {
     });
   }
 
-  return { bubbles: next, missedCount };
+  return { bubbles: next, missedCount, skippedBombCount };
 }

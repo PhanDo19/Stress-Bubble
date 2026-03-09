@@ -1,4 +1,5 @@
-﻿import { ACHIEVEMENTS } from '../../systems/achievementSystem.js';
+import { ACHIEVEMENTS } from '../../systems/achievementSystem.js';
+import { t } from '../i18n.js';
 
 function ensureRoot(rootEl) {
   if (!rootEl) return null;
@@ -8,18 +9,18 @@ function ensureRoot(rootEl) {
 
 function formatDaily(daily) {
   if (!daily || !daily.challenge) {
-    return { text: 'Daily: -', completed: false, canClaim: false };
+    return { text: t('daily.none'), completed: false, canClaim: false };
   }
   const c = daily.challenge;
   const progress = Number(daily.progress) || 0;
   const target = Number(c.target) || 1;
-  let label = 'Daily: -';
-  if (c.type === 'popCount') label = `Daily: POP ${c.target}`;
-  if (c.type === 'maxCombo') label = `Daily: COMBO x${c.target}`;
-  if (c.type === 'noBomb') label = 'Daily: NO BOMB';
-  if (c.type === 'score') label = `Daily: SCORE ${c.target}`;
-  if (c.type === 'missMax') label = `Daily: MISS <= ${c.target}`;
-  if (c.type === 'goldenCount') label = `Daily: GOLDEN ${c.target}`;
+  let label = t('daily.none');
+  if (c.type === 'popCount') label = t('daily.pop_count', { target: c.target });
+  if (c.type === 'maxCombo') label = t('daily.max_combo', { target: c.target });
+  if (c.type === 'noBomb') label = t('daily.no_bomb');
+  if (c.type === 'score') label = t('daily.score', { target: c.target });
+  if (c.type === 'missMax') label = t('daily.miss_max', { target: c.target });
+  if (c.type === 'goldenCount') label = t('daily.golden_count', { target: c.target });
 
   const displayTarget = c.type === 'noBomb' ? 1 : target;
   const displayProgress = c.type === 'noBomb' ? (daily.completed ? 1 : 0) : progress;
@@ -92,16 +93,16 @@ export function renderResult({
   container.style.backdropFilter = 'blur(10px)';
 
   const title = document.createElement('div');
-  title.textContent = 'Run Complete';
+  title.textContent = t('result.run_complete');
   title.style.fontSize = 'calc(24px * var(--ui-scale, 1))';
   title.style.fontWeight = '700';
 
   const scoreEl = document.createElement('div');
-  scoreEl.textContent = `Score: ${score}`;
+  scoreEl.textContent = t('result.score', { value: score });
   scoreEl.style.fontSize = 'calc(20px * var(--ui-scale, 1))';
 
   const rankEl = document.createElement('div');
-  rankEl.textContent = `Rank: ${rank}`;
+  rankEl.textContent = t('result.rank', { value: rank });
   rankEl.style.fontSize = 'calc(18px * var(--ui-scale, 1))';
   rankEl.style.fontWeight = '600';
   rankEl.style.color = '#fef08a';
@@ -114,12 +115,12 @@ export function renderResult({
   nearEl.style.color = 'rgba(255,255,255,0.7)';
 
   const pbEl = document.createElement('div');
-  pbEl.textContent = isPersonalBest ? 'Personal Best!' : '';
+  pbEl.textContent = isPersonalBest ? t('result.personal_best') : '';
   pbEl.style.fontSize = 'calc(14px * var(--ui-scale, 1))';
   pbEl.style.color = '#6ee7b7';
 
   const coinsEl = document.createElement('div');
-  coinsEl.textContent = `Coins: +${coinsEarned}`;
+  coinsEl.textContent = t('result.coins_plus', { value: coinsEarned });
   coinsEl.style.fontSize = 'calc(15px * var(--ui-scale, 1))';
 
   const rankProgressBlock = document.createElement('div');
@@ -133,7 +134,7 @@ export function renderResult({
 
   const nextRankText = document.createElement('div');
   nextRankText.textContent = rankProgress
-    ? `Next: ${rankProgress.nextRank} (${rankProgress.nextScore} pts)`
+    ? t('result.next_rank', { rank: rankProgress.nextRank, score: rankProgress.nextScore })
     : '';
   nextRankText.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
   nextRankText.style.opacity = '0.85';
@@ -164,7 +165,7 @@ export function renderResult({
   claimRow.style.display = dailyInfo.canClaim ? 'flex' : 'none';
   claimRow.style.justifyContent = 'center';
 
-  const claimButton = createButton(`Claim +${dailyInfo.reward}`, 'solid');
+  const claimButton = createButton(t('action.claim_plus', { value: dailyInfo.reward }), 'solid');
   claimButton.addEventListener('click', () => {
     if (typeof onClaim === 'function') onClaim();
   });
@@ -176,7 +177,7 @@ export function renderResult({
   actions.style.gap = '10px';
   actions.style.justifyContent = 'center';
 
-  const replayButton = createButton('Replay', 'solid');
+  const replayButton = createButton(t('action.replay'), 'solid');
   replayButton.style.boxShadow = '0 10px 24px rgba(56,189,248,0.2)';
   replayButton.style.transition = 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease';
   replayButton.addEventListener('mouseenter', () => {
@@ -201,7 +202,7 @@ export function renderResult({
     if (typeof onReplay === 'function') onReplay();
   });
 
-  const copyButton = createButton('Copy');
+  const copyButton = createButton(t('action.copy'));
   copyButton.style.transition = 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease';
   copyButton.addEventListener('mouseenter', () => {
     copyButton.style.transform = 'translateY(-1px)';
@@ -223,7 +224,7 @@ export function renderResult({
     if (typeof onCopy === 'function') onCopy();
   });
 
-  const homeButton = createButton('Home');
+  const homeButton = createButton(t('action.home'));
   homeButton.addEventListener('click', () => {
     if (typeof onHome === 'function') onHome();
   });
@@ -251,10 +252,10 @@ export function renderResult({
     statsBlock.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
     statsBlock.style.opacity = '0.85';
     statsBlock.innerHTML = `
-      <div>Total Pops</div><div>${runStats.pops ?? 0}</div>
-      <div>Best Combo</div><div>${runStats.maxCombo ?? 0}</div>
-      <div>Golden Hits</div><div>${runStats.goldenCount ?? 0}</div>
-      <div>Bomb Hits</div><div>${runStats.bombHits ?? 0}</div>
+      <div>${t('stats.total_pops')}</div><div>${runStats.pops ?? 0}</div>
+      <div>${t('stats.best_combo')}</div><div>${runStats.maxCombo ?? 0}</div>
+      <div>${t('stats.golden_hits')}</div><div>${runStats.goldenCount ?? 0}</div>
+      <div>${t('stats.bomb_hits')}</div><div>${runStats.bombHits ?? 0}</div>
     `;
     container.appendChild(statsBlock);
   }
@@ -269,11 +270,11 @@ export function renderResult({
     achievementsBlock.style.background = 'rgba(255,255,255,0.04)';
     achievementsBlock.style.border = '1px solid rgba(255,255,255,0.08)';
 
-    const title = document.createElement('div');
-    title.textContent = 'New Achievements';
-    title.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
-    title.style.opacity = '0.85';
-    title.style.fontWeight = '600';
+    const titleEl = document.createElement('div');
+    titleEl.textContent = t('result.new_achievements');
+    titleEl.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+    titleEl.style.opacity = '0.85';
+    titleEl.style.fontWeight = '600';
 
     const list = document.createElement('div');
     list.style.display = 'flex';
@@ -289,7 +290,7 @@ export function renderResult({
       list.appendChild(row);
     });
 
-    achievementsBlock.appendChild(title);
+    achievementsBlock.appendChild(titleEl);
     achievementsBlock.appendChild(list);
     container.appendChild(achievementsBlock);
   }
@@ -297,4 +298,3 @@ export function renderResult({
   container.appendChild(actions);
   root.appendChild(container);
 }
-

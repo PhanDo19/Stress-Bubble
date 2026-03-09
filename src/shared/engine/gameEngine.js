@@ -59,6 +59,7 @@ function createInitialState(config, modeOverride) {
     mode,
     movementState: 'calm',
     overloaded: false,
+    lowTimeNotified: false,
     config: config || null,
     runStats: {
       pops: 0,
@@ -92,6 +93,7 @@ function applyState(target, nextState) {
   if (nextState.mode !== undefined) target.mode = nextState.mode;
   if (nextState.movementState !== undefined) target.movementState = nextState.movementState;
   if (nextState.overloaded !== undefined) target.overloaded = nextState.overloaded;
+  if (nextState.lowTimeNotified !== undefined) target.lowTimeNotified = nextState.lowTimeNotified;
   if (nextState.config !== undefined) target.config = nextState.config;
   if (nextState.runStats !== undefined) target.runStats = nextState.runStats;
   if (nextState.worldWidth !== undefined) target.worldWidth = nextState.worldWidth;
@@ -131,6 +133,15 @@ function applyMisses(state, missedCount, config) {
     next = applyStress(next, { type: 'miss' }, config);
   }
   next = applyCombo(next, { type: 'miss' }, config);
+  return next;
+}
+
+function applySkippedBombs(state, skippedBombCount, config) {
+  if (skippedBombCount <= 0) return state;
+  let next = state;
+  for (let i = 0; i < skippedBombCount; i += 1) {
+    next = applyCombo(next, { type: 'hit' }, config);
+  }
   return next;
 }
 
@@ -199,6 +210,8 @@ export function createGameEngine(options = {}) {
   let running = false;
   let frameId = null;
   let lastTimestamp = null;
+  let smoothedFps = 60;
+  let particleDetailScale = 1;
 
   const maxDelta =
     typeof config.maxDeltaMs === 'number' ? config.maxDeltaMs : DEFAULT_MAX_DELTA_MS;
@@ -232,6 +245,7 @@ export function createGameEngine(options = {}) {
     engine.mode = base.mode;
     engine.movementState = base.movementState;
     engine.overloaded = base.overloaded;
+    engine.lowTimeNotified = base.lowTimeNotified;
     engine.config = base.config;
     engine.runStats = base.runStats;
     engine.worldWidth = base.worldWidth;
@@ -273,6 +287,8 @@ export function createGameEngine(options = {}) {
       };
     }
     next = applyMisses(next, lifetime.missedCount, config);
+    next = applySkippedBombs(next, lifetime.skippedBombCount || 0, config);
+    next = updateRunStatsMaxCombo(next);
 
     next = updateComboTimer(next, deltaMs);
 
@@ -281,6 +297,12 @@ export function createGameEngine(options = {}) {
 
     if (Number.isFinite(next.timeLeftMs)) {
       next = { ...next, timeLeftMs: Math.max(0, next.timeLeftMs - deltaMs) };
+    }
+
+    const lowTimeThresholdMs = 10000;
+    if (!next.lowTimeNotified && next.timeLeftMs > 0 && next.timeLeftMs <= lowTimeThresholdMs) {
+      next = { ...next, lowTimeNotified: true };
+      emit('low-time', { timeLeftMs: next.timeLeftMs });
     }
 
     applyState(engine, next);
@@ -317,6 +339,12 @@ export function createGameEngine(options = {}) {
 
   function onTick(deltaMs, timestamp) {
     const clamped = clampDelta(deltaMs, maxDelta);
+    if (clamped > 0) {
+      const instantFps = 1000 / clamped;
+      smoothedFps = smoothedFps * 0.9 + instantFps * 0.1;
+      if (smoothedFps < 45) particleDetailScale = 0.6;
+      else if (smoothedFps > 55) particleDetailScale = 1;
+    }
     step(clamped, timestamp ?? now());
   }
 
@@ -401,8 +429,6 @@ export function createGameEngine(options = {}) {
     const hit = popBubbleAt(engine.bubbles, x, y);
     if (!hit.popped) return;
 
-    emit('pop', { type: hit.popped.type, x: hit.popped.x, y: hit.popped.y });
-
     let next = { ...engine, bubbles: hit.bubbles };
     const isBomb = hit.popped.type === 'bomb';
 
@@ -446,9 +472,19 @@ export function createGameEngine(options = {}) {
     }
 
     next = updateRunStatsMaxCombo(next);
+    emit('pop', {
+      type: hit.popped.type,
+      x: hit.popped.x,
+      y: hit.popped.y,
+      comboMultiplier: next.combo?.multiplier ?? 1,
+    });
 
     const maxParticles =
       typeof config.maxParticles === 'number' ? config.maxParticles : 30;
+    const adaptiveMaxParticles = Math.max(
+      8,
+      Math.round(maxParticles * particleDetailScale)
+    );
     const maxFloatingTexts =
       typeof config.maxFloatingTexts === 'number' ? config.maxFloatingTexts : 24;
     next = {
@@ -457,8 +493,9 @@ export function createGameEngine(options = {}) {
         next.particles,
         hit.popped.x,
         hit.popped.y,
-        maxParticles,
-        rng
+        adaptiveMaxParticles,
+        rng,
+        particleDetailScale
       ),
       floatingTexts: emitFloatingText(
         next.floatingTexts,

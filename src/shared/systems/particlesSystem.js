@@ -32,8 +32,15 @@ export function emitPopParticles(particles, x, y, intensity = 6, maxParticles = 
   return next;
 }
 
-export function emitPopBurst(particles, x, y, maxParticles = DEFAULT_MAX_PARTICLES, rng = Math.random) {
-  const count = 6 + Math.floor(rng() * 5);
+export function emitPopBurst(
+  particles,
+  x,
+  y,
+  maxParticles = DEFAULT_MAX_PARTICLES,
+  rng = Math.random,
+  detailScale = 1
+) {
+  const count = Math.max(1, Math.round((6 + Math.floor(rng() * 5)) * Math.max(0.25, detailScale)));
   return emitPopParticles(particles, x, y, count, maxParticles, rng);
 }
 

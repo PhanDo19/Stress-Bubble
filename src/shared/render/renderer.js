@@ -1,4 +1,4 @@
-﻿import { renderBubbles } from './bubbleRenderer.js';
+import { createSkinPreviewBubbles, renderBubbles } from './bubbleRenderer.js';
 import { renderHud } from './hud.js';
 
 function ensureBackground(ctx, width, height, assets) {
@@ -25,10 +25,14 @@ export function renderFrame(ctx, canvas, state, assets = null) {
   const height = Number.isFinite(state?.worldHeight) ? state.worldHeight : canvas.height;
   const comboCount = state?.combo?.count || 0;
   const comboTime = state?.combo?.timeLeftMs || 0;
+  const reducedMotion = !!state?.config?.reducedMotion;
+  const highContrast = !!state?.config?.highContrast;
 
   let shake = 0;
-  if (comboCount >= 10 && comboTime > 1000) shake = 1.6;
-  else if (comboCount >= 5 && comboTime > 1000) shake = 0.8;
+  if (!reducedMotion) {
+    if (comboCount >= 10 && comboTime > 1000) shake = 1.6;
+    else if (comboCount >= 5 && comboTime > 1000) shake = 0.8;
+  }
 
   const shakeX = shake ? (Math.random() - 0.5) * 2 * shake : 0;
   const shakeY = shake ? (Math.random() - 0.5) * 2 * shake : 0;
@@ -36,7 +40,12 @@ export function renderFrame(ctx, canvas, state, assets = null) {
   ctx.save();
   ctx.translate(shakeX, shakeY);
   ctx.clearRect(-shake, -shake, width + shake * 2, height + shake * 2);
-  ensureBackground(ctx, width, height, assets);
+  if (highContrast) {
+    ctx.fillStyle = '#05070d';
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    ensureBackground(ctx, width, height, assets);
+  }
 
   renderBubbles(ctx, state.bubbles, state?.selectedSkin);
 
@@ -72,4 +81,20 @@ export function renderFrame(ctx, canvas, state, assets = null) {
   }
 
   renderHud(ctx, canvas, state);
+}
+
+export function renderSkinPreview(ctx, canvas, skinId = 'skin_classic') {
+  if (!ctx || !canvas) return;
+
+  const width = Number(canvas.width) || 320;
+  const height = Number(canvas.height) || 140;
+
+  ensureBackground(ctx, width, height, null);
+
+  const nowMs =
+    typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
+  const bubbles = createSkinPreviewBubbles(width, height, nowMs);
+  renderBubbles(ctx, bubbles, skinId);
 }

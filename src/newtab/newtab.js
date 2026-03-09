@@ -32,6 +32,9 @@ const DEFAULT_SETTINGS = {
   sfx: true,
   music: true,
   vibe: false,
+  muteAudio: false,
+  reducedMotion: false,
+  highContrast: false,
   sfxVolume: 0.8,
   musicVolume: 0.4,
   musicStyle: 'chill',
@@ -71,6 +74,8 @@ const CONFIG_BASE = {
   maxBubbles: 12,
   maxParticles: 30,
   maxFloatingTexts: 24,
+  reducedMotion: false,
+  highContrast: false,
 };
 
 const CONFIG = {
@@ -83,6 +88,8 @@ const CONFIG = {
   maxBubbles: 0,
   maxParticles: 0,
   maxFloatingTexts: 0,
+  reducedMotion: false,
+  highContrast: false,
 };
 
 function cloneMap(map) {
@@ -103,6 +110,8 @@ function resetConfig(target, base) {
   target.maxBubbles = base.maxBubbles;
   target.maxParticles = base.maxParticles;
   target.maxFloatingTexts = base.maxFloatingTexts;
+  target.reducedMotion = !!base.reducedMotion;
+  target.highContrast = !!base.highContrast;
 }
 
 function scaleMap(map, factor) {
@@ -155,6 +164,11 @@ function applyDifficulty(config, base, difficulty) {
   }
 }
 
+function applyAccessibility(config, settings) {
+  config.reducedMotion = !!settings?.reducedMotion;
+  config.highContrast = !!settings?.highContrast;
+}
+
 function normalizeSettings(settings) {
   const next = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   if (!['easy', 'normal', 'hard'].includes(next.difficulty)) {
@@ -163,6 +177,9 @@ function normalizeSettings(settings) {
   next.sfx = !!next.sfx;
   next.music = !!next.music;
   next.vibe = !!next.vibe;
+  next.muteAudio = !!next.muteAudio;
+  next.reducedMotion = !!next.reducedMotion;
+  next.highContrast = !!next.highContrast;
   next.sfxVolume = Math.max(0, Math.min(1, Number(next.sfxVolume)));
   next.musicVolume = Math.max(0, Math.min(1, Number(next.musicVolume)));
   if (!['chill', 'hiphop', 'minimal'].includes(next.musicStyle)) {
@@ -282,18 +299,19 @@ function buildCopyText(result) {
 }
 
 async function setup() {
-  const { canvas, overlay } = createLayout();
-  const { ctx } = setupHiDPICanvas(canvas);
-
   let model = await loadModel();
   let selectedMode = 'classic';
   let lastResult = null;
   let lastPersonalBest = false;
   const audio = createAudioManager();
 
+  const { canvas, overlay } = createLayout();
+  const { ctx } = setupHiDPICanvas(canvas);
+
   audio.setSettings(model.settings);
 
   applyDifficulty(CONFIG, CONFIG_BASE, model.settings.difficulty);
+  applyAccessibility(CONFIG, model.settings);
 
   const engine = createGameEngine({
     renderer: { renderFrame },
@@ -325,6 +343,7 @@ async function setup() {
       onSettingsChange: async (patch) => {
         model.settings = normalizeSettings({ ...model.settings, ...patch });
         applyDifficulty(CONFIG, CONFIG_BASE, model.settings.difficulty);
+        applyAccessibility(CONFIG, model.settings);
         await saveSettings(model.settings);
         audio.setSettings(model.settings);
         showHome();
@@ -335,6 +354,7 @@ async function setup() {
         await clearAll();
         model = await loadModel();
         applyDifficulty(CONFIG, CONFIG_BASE, model.settings.difficulty);
+        applyAccessibility(CONFIG, model.settings);
         audio.setSettings(model.settings);
         engine.init();
         showHome();
@@ -473,11 +493,15 @@ async function setup() {
   });
 
   engine.on('pop', (payload) => {
-    audio.playPop(payload?.type || 'normal');
+    audio.playPop(payload?.type || 'normal', payload?.comboMultiplier || 1);
   });
 
   engine.on('miss', (payload) => {
     audio.playMiss(payload?.count || 1);
+  });
+
+  engine.on('low-time', () => {
+    audio.playLowTimeWarning();
   });
 
   engine.init();
