@@ -4,6 +4,8 @@
   --text: #e6edf7;
   --muted: #9fb0cc;
   --ui-scale: 1;
+  --font-ui: "Aptos", "Trebuchet MS", Verdana, sans-serif;
+  --font-display: "Trebuchet MS", "Aptos", Verdana, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -15,7 +17,10 @@ html, body {
   height: 100%;
   background: radial-gradient(120% 120% at 50% 0%, #14213a 0%, #0b1220 60%, #070c16 100%);
   color: var(--text);
-  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .app {

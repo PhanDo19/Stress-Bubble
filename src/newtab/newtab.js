@@ -27,166 +27,8 @@ import { setupHiDPICanvas } from '../shared/render/canvasScale.js';
 import { buyItem } from '../shared/ui/shopSystem.js';
 import { createAudioManager } from '../shared/audio/audioManager.js';
 import { evaluateAchievements } from '../shared/systems/achievementSystem.js';
-
-const DEFAULT_SETTINGS = {
-  sfx: true,
-  music: true,
-  vibe: false,
-  muteAudio: false,
-  reducedMotion: false,
-  highContrast: false,
-  sfxVolume: 0.8,
-  musicVolume: 0.4,
-  musicStyle: 'chill',
-  difficulty: 'normal',
-};
-
-const CONFIG_BASE = {
-  spawnInterval: {
-    classic: { min: 450, max: 900 },
-    rage: { min: 250, max: 550 },
-    zen: { min: 600, max: 1100 },
-  },
-  bubbleSpeed: {
-    normal: 60,
-    fast: 95,
-    golden: 70,
-    bomb: 80,
-  },
-  bubbleLifetime: {
-    normal: 2.6,
-    fast: 1.9,
-    golden: 2.4,
-    bomb: 2.2,
-  },
-  spawnRates: {
-    normal: 0.7,
-    fast: 0.15,
-    golden: 0.05,
-    bomb: 0.1,
-  },
-  comboWindowMs: 1200,
-  stressValues: {
-    miss: 8,
-    hit: -3,
-    bomb: 12,
-  },
-  maxBubbles: 12,
-  maxParticles: 30,
-  maxFloatingTexts: 24,
-  reducedMotion: false,
-  highContrast: false,
-};
-
-const CONFIG = {
-  spawnInterval: {},
-  bubbleSpeed: {},
-  bubbleLifetime: {},
-  spawnRates: {},
-  comboWindowMs: 0,
-  stressValues: {},
-  maxBubbles: 0,
-  maxParticles: 0,
-  maxFloatingTexts: 0,
-  reducedMotion: false,
-  highContrast: false,
-};
-
-function cloneMap(map) {
-  return { ...map };
-}
-
-function resetConfig(target, base) {
-  target.spawnInterval = {
-    classic: { ...base.spawnInterval.classic },
-    rage: { ...base.spawnInterval.rage },
-    zen: { ...base.spawnInterval.zen },
-  };
-  target.bubbleSpeed = cloneMap(base.bubbleSpeed);
-  target.bubbleLifetime = cloneMap(base.bubbleLifetime);
-  target.spawnRates = cloneMap(base.spawnRates);
-  target.comboWindowMs = base.comboWindowMs;
-  target.stressValues = cloneMap(base.stressValues);
-  target.maxBubbles = base.maxBubbles;
-  target.maxParticles = base.maxParticles;
-  target.maxFloatingTexts = base.maxFloatingTexts;
-  target.reducedMotion = !!base.reducedMotion;
-  target.highContrast = !!base.highContrast;
-}
-
-function scaleMap(map, factor) {
-  const next = {};
-  for (const [key, value] of Object.entries(map)) {
-    next[key] = Number(value) * factor;
-  }
-  return next;
-}
-
-function applyDifficulty(config, base, difficulty) {
-  resetConfig(config, base);
-
-  if (difficulty === 'easy') {
-    config.spawnInterval = {
-      classic: {
-        min: base.spawnInterval.classic.min * 1.2,
-        max: base.spawnInterval.classic.max * 1.2,
-      },
-      rage: {
-        min: base.spawnInterval.rage.min * 1.2,
-        max: base.spawnInterval.rage.max * 1.2,
-      },
-      zen: {
-        min: base.spawnInterval.zen.min * 1.2,
-        max: base.spawnInterval.zen.max * 1.2,
-      },
-    };
-    config.bubbleSpeed = scaleMap(base.bubbleSpeed, 0.85);
-    config.bubbleLifetime = scaleMap(base.bubbleLifetime, 1.15);
-    config.maxBubbles = Math.max(8, Math.round(base.maxBubbles * 0.85));
-  } else if (difficulty === 'hard') {
-    config.spawnInterval = {
-      classic: {
-        min: base.spawnInterval.classic.min * 0.8,
-        max: base.spawnInterval.classic.max * 0.8,
-      },
-      rage: {
-        min: base.spawnInterval.rage.min * 0.8,
-        max: base.spawnInterval.rage.max * 0.8,
-      },
-      zen: {
-        min: base.spawnInterval.zen.min * 0.8,
-        max: base.spawnInterval.zen.max * 0.8,
-      },
-    };
-    config.bubbleSpeed = scaleMap(base.bubbleSpeed, 1.2);
-    config.bubbleLifetime = scaleMap(base.bubbleLifetime, 0.9);
-    config.maxBubbles = Math.max(base.maxBubbles, Math.round(base.maxBubbles * 1.2));
-  }
-}
-
-function applyAccessibility(config, settings) {
-  config.reducedMotion = !!settings?.reducedMotion;
-  config.highContrast = !!settings?.highContrast;
-}
-
-function normalizeSettings(settings) {
-  const next = { ...DEFAULT_SETTINGS, ...(settings || {}) };
-  if (!['easy', 'normal', 'hard'].includes(next.difficulty)) {
-    next.difficulty = 'normal';
-  }
-  next.sfx = !!next.sfx;
-  next.music = !!next.music;
-  next.vibe = !!next.vibe;
-  next.muteAudio = !!next.muteAudio;
-  next.reducedMotion = !!next.reducedMotion;
-  next.highContrast = !!next.highContrast;
-  next.sfxVolume = Math.max(0, Math.min(1, Number(next.sfxVolume)));
-  next.musicVolume = Math.max(0, Math.min(1, Number(next.musicVolume)));
-  if (!['chill', 'hiphop', 'minimal'].includes(next.musicStyle)) {
-    next.musicStyle = 'chill';
-  }
-  return next;
-}
+import { computeRank } from '../shared/systems/rankSystem.js';
+import { createGameConfig, normalizeSettings, syncGameConfig } from '../shared/systems/gameConfig.js';
 
 function createLayout() {
   const root = document.createElement('div');
@@ -219,44 +61,6 @@ function createLayout() {
   document.body.appendChild(root);
 
   return { root, canvas, overlay };
-}
-
-function computeRank(score) {
-  const tiers = [
-    { name: 'Bronze', min: 0 },
-    { name: 'Silver', min: 1800 },
-    { name: 'Gold', min: 2600 },
-    { name: 'Diamond', min: 3400 },
-    { name: 'Master', min: 4200 },
-  ];
-
-  let rank = tiers[0];
-  for (const tier of tiers) {
-    if (score >= tier.min) rank = tier;
-  }
-
-  const nextTier = tiers.find((tier) => tier.min > rank.min);
-  const nearMiss = nextTier
-    ? `Need ${Math.max(0, nextTier.min - score)} for ${nextTier.name}`
-    : 'Top rank';
-
-  const progress = nextTier
-    ? Math.max(0, Math.min(1, (score - rank.min) / (nextTier.min - rank.min)))
-    : 1;
-
-  return {
-    rank: rank.name,
-    nearMiss,
-    rankProgress: nextTier
-      ? {
-          currentRank: rank.name,
-          nextRank: nextTier.name,
-          currentScore: score,
-          nextScore: nextTier.min,
-          progress,
-        }
-      : null,
-  };
 }
 
 async function loadModel() {
@@ -304,20 +108,18 @@ async function setup() {
   let lastResult = null;
   let lastPersonalBest = false;
   const audio = createAudioManager();
+  const config = createGameConfig(model.settings);
 
   const { canvas, overlay } = createLayout();
   const { ctx } = setupHiDPICanvas(canvas);
 
   audio.setSettings(model.settings);
 
-  applyDifficulty(CONFIG, CONFIG_BASE, model.settings.difficulty);
-  applyAccessibility(CONFIG, model.settings);
-
   const engine = createGameEngine({
     renderer: { renderFrame },
     canvas,
     ctx,
-    config: CONFIG,
+    config,
   });
 
   function showHome() {
@@ -342,8 +144,7 @@ async function setup() {
       },
       onSettingsChange: async (patch) => {
         model.settings = normalizeSettings({ ...model.settings, ...patch });
-        applyDifficulty(CONFIG, CONFIG_BASE, model.settings.difficulty);
-        applyAccessibility(CONFIG, model.settings);
+        syncGameConfig(config, model.settings);
         await saveSettings(model.settings);
         audio.setSettings(model.settings);
         showHome();
@@ -353,8 +154,7 @@ async function setup() {
         if (!ok) return;
         await clearAll();
         model = await loadModel();
-        applyDifficulty(CONFIG, CONFIG_BASE, model.settings.difficulty);
-        applyAccessibility(CONFIG, model.settings);
+        syncGameConfig(config, model.settings);
         audio.setSettings(model.settings);
         engine.init();
         showHome();

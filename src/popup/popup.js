@@ -20,68 +20,8 @@ import { updateStreak } from '../shared/systems/streakSystem.js';
 import { coinsForRun } from '../shared/systems/coinSystem.js';
 import { evaluateAchievements } from '../shared/systems/achievementSystem.js';
 import { setupHiDPICanvas } from '../shared/render/canvasScale.js';
-
-const CONFIG = {
-  spawnInterval: {
-    classic: { min: 450, max: 900 },
-    rage: { min: 250, max: 550 },
-    zen: { min: 600, max: 1100 },
-  },
-  bubbleSpeed: {
-    normal: 60,
-    fast: 95,
-    golden: 70,
-    bomb: 80,
-  },
-  bubbleLifetime: {
-    normal: 2.6,
-    fast: 1.9,
-    golden: 2.4,
-    bomb: 2.2,
-  },
-  spawnRates: {
-    normal: 0.7,
-    fast: 0.15,
-    golden: 0.05,
-    bomb: 0.1,
-  },
-  comboWindowMs: 1200,
-  stressValues: {
-    miss: 8,
-    hit: -3,
-    bomb: 12,
-  },
-  maxBubbles: 12,
-  maxParticles: 30,
-};
-
-const DEFAULT_SETTINGS = {
-  sfx: true,
-  music: true,
-  vibe: false,
-  muteAudio: false,
-  reducedMotion: false,
-  highContrast: false,
-  sfxVolume: 0.8,
-  musicVolume: 0.4,
-  musicStyle: 'chill',
-  difficulty: 'normal',
-};
-
-function normalizeSettings(settings) {
-  const next = { ...DEFAULT_SETTINGS, ...(settings || {}) };
-  next.sfx = !!next.sfx;
-  next.music = !!next.music;
-  next.vibe = !!next.vibe;
-  next.muteAudio = !!next.muteAudio;
-  next.reducedMotion = !!next.reducedMotion;
-  next.highContrast = !!next.highContrast;
-  next.sfxVolume = Math.max(0, Math.min(1, Number(next.sfxVolume)));
-  next.musicVolume = Math.max(0, Math.min(1, Number(next.musicVolume)));
-  if (!['chill', 'hiphop', 'minimal'].includes(next.musicStyle)) next.musicStyle = 'chill';
-  if (!['easy', 'normal', 'hard'].includes(next.difficulty)) next.difficulty = 'normal';
-  return next;
-}
+import { computeRank } from '../shared/systems/rankSystem.js';
+import { createGameConfig, normalizeSettings, syncGameConfig } from '../shared/systems/gameConfig.js';
 
 function createLayout() {
   const root = document.createElement('div');
@@ -112,28 +52,6 @@ function createLayout() {
   document.body.appendChild(root);
 
   return { root, canvas, overlay };
-}
-
-function computeRank(score) {
-  const tiers = [
-    { name: 'Bronze', min: 0 },
-    { name: 'Silver', min: 1800 },
-    { name: 'Gold', min: 2600 },
-    { name: 'Diamond', min: 3400 },
-    { name: 'Master', min: 4200 },
-  ];
-
-  let rank = tiers[0];
-  for (const tier of tiers) {
-    if (score >= tier.min) rank = tier;
-  }
-
-  const nextTier = tiers.find((tier) => tier.min > rank.min);
-  const nearMiss = nextTier
-    ? `Need ${Math.max(0, nextTier.min - score)} for ${nextTier.name}`
-    : 'Top rank';
-
-  return { rank: rank.name, nearMiss };
 }
 
 async function loadModel() {
@@ -171,12 +89,17 @@ async function setup() {
   const { ctx } = setupHiDPICanvas(canvas);
 
   let model = await loadModel();
+  let selectedMode = 'classic';
+  let compactSettingsOpen = false;
+  let compactSettingsSection = 'menu';
+  const config = createGameConfig(model.settings);
+  config.hudVisibility = 'playing-only';
 
   const engine = createGameEngine({
     renderer: { renderFrame },
     canvas,
     ctx,
-    config: CONFIG,
+    config,
   });
 
   function openFullScreenGame() {
@@ -198,12 +121,36 @@ async function setup() {
     renderHome({
       rootEl: overlay,
       model,
+      selectedMode,
       settings: model.settings,
-      onPlay: () => startGame('classic'),
+      variant: 'compact',
+      compactSettingsOpen,
+      compactSettingsSection,
+      onToggleCompactSettings: () => {
+        compactSettingsOpen = !compactSettingsOpen;
+        compactSettingsSection = 'menu';
+        showHome();
+      },
+      onSelectCompactSettingsSection: (section) => {
+        compactSettingsOpen = true;
+        compactSettingsSection = section;
+        showHome();
+      },
+      onBackCompactSettings: () => {
+        compactSettingsSection = 'menu';
+        showHome();
+      },
+      onModeChange: (mode) => {
+        selectedMode = mode;
+        showHome();
+      },
+      onPlay: () => startGame(selectedMode),
       onOpenFullscreen: () => openFullScreenGame(),
       onSettingsChange: async (patch) => {
         model.settings = normalizeSettings({ ...model.settings, ...patch });
+        syncGameConfig(config, model.settings);
         await saveSettings(model.settings);
+        compactSettingsOpen = true;
         showHome();
       },
     });
@@ -215,7 +162,7 @@ async function setup() {
       rootEl: overlay,
       result,
       model,
-      onReplay: () => startGame(result.mode || 'classic'),
+      onReplay: () => startGame(result.mode || selectedMode),
       onCopy: async () => {
         const text = buildCopyText(result);
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -223,6 +170,10 @@ async function setup() {
         } else {
           window.prompt('Copy result', text);
         }
+      },
+      onHome: () => {
+        engine.init();
+        showHome();
       },
     });
   }
@@ -280,7 +231,7 @@ async function setup() {
     canvas,
     onClick: (x, y) => engine.handleClick(x, y),
     onStart: () => {
-      if (engine.state === 'HOME' || engine.state === 'RESULT') startGame('classic');
+      if (engine.state === 'HOME' || engine.state === 'RESULT') startGame(selectedMode);
     },
     onRestart: () => engine.restart(),
     onPauseToggle: () => engine.togglePause(),

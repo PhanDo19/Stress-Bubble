@@ -33,9 +33,11 @@ function formatDaily(daily) {
   };
 }
 
-function createButton(text, variant = 'ghost') {
+function createButton(text, variant = 'ghost', options = {}) {
   const button = document.createElement('button');
-  button.textContent = text;
+  const { icon = null, compact = false, iconOnly = false } = options;
+  button.title = text;
+  button.setAttribute('aria-label', text);
   button.style.padding = variant === 'solid' ? '10px 18px' : '8px 16px';
   button.style.borderRadius = '12px';
   button.style.border = '1px solid rgba(255,255,255,0.18)';
@@ -46,9 +48,107 @@ function createButton(text, variant = 'ghost') {
   button.style.color = '#ffffff';
   button.style.fontSize = 'calc(14px * var(--ui-scale, 1))';
   button.style.fontWeight = variant === 'solid' ? '600' : '500';
+  button.style.fontFamily = 'var(--font-ui)';
+  button.style.letterSpacing = '0.01em';
   button.style.cursor = 'pointer';
   button.style.backdropFilter = 'blur(6px)';
+  button.style.display = 'inline-flex';
+  button.style.alignItems = 'center';
+  button.style.justifyContent = 'center';
+  button.style.gap = '8px';
+  button.style.position = 'relative';
+  button.style.overflow = 'hidden';
+  button.style.transition =
+    'transform 140ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease, filter 180ms ease';
+  button.style.boxShadow =
+    variant === 'solid'
+      ? '0 10px 24px rgba(56,189,248,0.2)'
+      : compact
+        ? '0 8px 18px rgba(0,0,0,0.18)'
+        : 'none';
+
+  const label = document.createElement('span');
+  label.textContent = text;
+  label.style.position = 'relative';
+  label.style.zIndex = '1';
+  if (iconOnly) {
+    label.style.display = 'none';
+    button.style.padding = compact ? '8px' : '10px';
+    button.style.width = compact ? '40px' : '42px';
+    button.style.minWidth = compact ? '40px' : '42px';
+    button.style.height = compact ? '40px' : '42px';
+    button.style.borderRadius = '999px';
+    button.style.gap = '0';
+  }
+
+  const sheen = document.createElement('span');
+  sheen.style.position = 'absolute';
+  sheen.style.inset = '0';
+  sheen.style.background =
+    'linear-gradient(115deg, transparent 15%, rgba(255,255,255,0.12) 45%, transparent 75%)';
+  sheen.style.transform = 'translateX(-140%)';
+  sheen.style.transition = 'transform 320ms ease';
+  sheen.style.pointerEvents = 'none';
+
+  if (icon) {
+    icon.style.position = 'relative';
+    icon.style.zIndex = '1';
+    button.appendChild(icon);
+  }
+
+  button.appendChild(label);
+  button.appendChild(sheen);
+
+  button.addEventListener('mouseenter', () => {
+    button.style.transform = 'translateY(-1px)';
+    button.style.filter = 'brightness(1.05)';
+    button.style.boxShadow =
+      variant === 'solid'
+        ? '0 14px 30px rgba(56,189,248,0.28)'
+        : compact
+          ? '0 12px 24px rgba(0,0,0,0.24)'
+          : '0 8px 18px rgba(255,255,255,0.12)';
+    sheen.style.transform = 'translateX(140%)';
+  });
+
+  button.addEventListener('mouseleave', () => {
+    button.style.transform = 'translateY(0)';
+    button.style.filter = 'none';
+    button.style.boxShadow =
+      variant === 'solid'
+        ? '0 10px 24px rgba(56,189,248,0.2)'
+        : compact
+          ? '0 8px 18px rgba(0,0,0,0.18)'
+          : 'none';
+    sheen.style.transition = 'none';
+    sheen.style.transform = 'translateX(-140%)';
+    void sheen.offsetWidth;
+    sheen.style.transition = 'transform 320ms ease';
+  });
+
+  button.addEventListener('mousedown', () => {
+    button.style.transform = 'translateY(1px) scale(0.99)';
+  });
+
+  button.addEventListener('mouseup', () => {
+    button.style.transform = 'translateY(-1px)';
+  });
+
   return button;
+}
+
+function createIcon(symbol) {
+  const icon = document.createElement('span');
+  icon.textContent = symbol;
+  icon.setAttribute('aria-hidden', 'true');
+  icon.style.display = 'inline-flex';
+  icon.style.alignItems = 'center';
+  icon.style.justifyContent = 'center';
+  icon.style.width = '16px';
+  icon.style.height = '16px';
+  icon.style.fontSize = '14px';
+  icon.style.opacity = '0.92';
+  return icon;
 }
 
 export function renderResult({
@@ -96,16 +196,22 @@ export function renderResult({
   title.textContent = t('result.run_complete');
   title.style.fontSize = 'calc(24px * var(--ui-scale, 1))';
   title.style.fontWeight = '700';
+  title.style.fontFamily = 'var(--font-display)';
+  title.style.letterSpacing = '0.02em';
+  title.style.lineHeight = '1';
 
   const scoreEl = document.createElement('div');
   scoreEl.textContent = t('result.score', { value: score });
   scoreEl.style.fontSize = 'calc(20px * var(--ui-scale, 1))';
+  scoreEl.style.fontWeight = '600';
+  scoreEl.style.letterSpacing = '0.01em';
 
   const rankEl = document.createElement('div');
   rankEl.textContent = t('result.rank', { value: rank });
   rankEl.style.fontSize = 'calc(18px * var(--ui-scale, 1))';
   rankEl.style.fontWeight = '600';
   rankEl.style.color = '#fef08a';
+  rankEl.style.letterSpacing = '0.01em';
 
   const nearEl = document.createElement('div');
   nearEl.textContent = nearMiss;
@@ -165,7 +271,10 @@ export function renderResult({
   claimRow.style.display = dailyInfo.canClaim ? 'flex' : 'none';
   claimRow.style.justifyContent = 'center';
 
-  const claimButton = createButton(t('action.claim_plus', { value: dailyInfo.reward }), 'solid');
+  const claimButton = createButton(t('action.claim_plus', { value: dailyInfo.reward }), 'solid', {
+    icon: createIcon('+'),
+    iconOnly: true,
+  });
   claimButton.addEventListener('click', () => {
     if (typeof onClaim === 'function') onClaim();
   });
@@ -177,61 +286,34 @@ export function renderResult({
   actions.style.gap = '10px';
   actions.style.justifyContent = 'center';
 
-  const replayButton = createButton(t('action.replay'), 'solid');
-  replayButton.style.boxShadow = '0 10px 24px rgba(56,189,248,0.2)';
-  replayButton.style.transition = 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease';
-  replayButton.addEventListener('mouseenter', () => {
-    replayButton.style.transform = 'translateY(-1px)';
-    replayButton.style.boxShadow = '0 14px 30px rgba(56,189,248,0.3)';
-    replayButton.style.filter = 'brightness(1.08)';
-  });
-  replayButton.addEventListener('mouseleave', () => {
-    replayButton.style.transform = 'translateY(0)';
-    replayButton.style.boxShadow = '0 10px 24px rgba(56,189,248,0.2)';
-    replayButton.style.filter = 'none';
-  });
-  replayButton.addEventListener('mousedown', () => {
-    replayButton.style.transform = 'translateY(1px)';
-    replayButton.style.boxShadow = '0 6px 16px rgba(56,189,248,0.2)';
-  });
-  replayButton.addEventListener('mouseup', () => {
-    replayButton.style.transform = 'translateY(-1px)';
-    replayButton.style.boxShadow = '0 14px 30px rgba(56,189,248,0.3)';
+  const replayButton = createButton(t('action.replay'), 'solid', {
+    icon: createIcon('\u21bb'),
+    iconOnly: true,
   });
   replayButton.addEventListener('click', () => {
     if (typeof onReplay === 'function') onReplay();
   });
 
-  const copyButton = createButton(t('action.copy'));
-  copyButton.style.transition = 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease';
-  copyButton.addEventListener('mouseenter', () => {
-    copyButton.style.transform = 'translateY(-1px)';
-    copyButton.style.boxShadow = '0 10px 22px rgba(255,255,255,0.15)';
-    copyButton.style.filter = 'brightness(1.05)';
-  });
-  copyButton.addEventListener('mouseleave', () => {
-    copyButton.style.transform = 'translateY(0)';
-    copyButton.style.boxShadow = 'none';
-    copyButton.style.filter = 'none';
-  });
-  copyButton.addEventListener('mousedown', () => {
-    copyButton.style.transform = 'translateY(1px)';
-  });
-  copyButton.addEventListener('mouseup', () => {
-    copyButton.style.transform = 'translateY(-1px)';
+  const copyButton = createButton(t('action.copy'), 'ghost', {
+    icon: createIcon('\u2398'),
+    iconOnly: true,
   });
   copyButton.addEventListener('click', () => {
     if (typeof onCopy === 'function') onCopy();
   });
 
-  const homeButton = createButton(t('action.home'));
-  homeButton.addEventListener('click', () => {
-    if (typeof onHome === 'function') onHome();
-  });
-
   actions.appendChild(replayButton);
   actions.appendChild(copyButton);
-  actions.appendChild(homeButton);
+  if (typeof onHome === 'function') {
+    const homeButton = createButton(t('action.home'), 'ghost', {
+      icon: createIcon('\u2302'),
+      iconOnly: true,
+    });
+    homeButton.addEventListener('click', () => {
+      onHome();
+    });
+    actions.appendChild(homeButton);
+  }
 
   container.appendChild(title);
   container.appendChild(scoreEl);
@@ -241,7 +323,6 @@ export function renderResult({
   container.appendChild(coinsEl);
   container.appendChild(dailyEl);
   if (rankProgress) container.appendChild(rankProgressBlock);
-  if (nearMiss) container.appendChild(nearEl);
 
   if (runStats) {
     const statsBlock = document.createElement('div');

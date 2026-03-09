@@ -1,6 +1,14 @@
 import { createSkinPreviewBubbles, renderBubbles } from './bubbleRenderer.js';
 import { renderHud } from './hud.js';
 
+function shouldRenderHud(state) {
+  const visibility = state?.config?.hudVisibility || 'always';
+  if (visibility === 'playing-only') {
+    return state?.state === 'PLAYING' || state?.state === 'PAUSED';
+  }
+  return true;
+}
+
 function ensureBackground(ctx, width, height, assets) {
   if (assets && assets.backgroundGradient) {
     ctx.fillStyle = assets.backgroundGradient;
@@ -80,7 +88,9 @@ export function renderFrame(ctx, canvas, state, assets = null) {
     ctx.textBaseline = 'alphabetic';
   }
 
-  renderHud(ctx, canvas, state);
+  if (shouldRenderHud(state)) {
+    renderHud(ctx, canvas, state);
+  }
 }
 
 export function renderSkinPreview(ctx, canvas, skinId = 'skin_classic') {

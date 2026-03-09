@@ -1,11 +1,26 @@
 {
   "manifest_version": 3,
   "name": "Stress Bubble",
-  "description": "Stress Bubble mini-game for New Tab.",
-  "version": "0.1.0",
+  "description": "Bubble popping mini-game for quick stress relief in Chrome New Tab and popup.",
+  "version": "0.2.0",
   "action": {
     "default_title": "Stress Bubble",
-    "default_popup": "src/popup/popup.html"
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "chrome_url_overrides": {
+    "newtab": "src/newtab/newtab.html"
   },
   "permissions": ["storage"]
 }

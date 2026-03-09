@@ -44,9 +44,17 @@ function formatDailyProgress({ label, progress, target }) {
   return `${label} (${Math.min(safeProgress, safeTarget)}/${safeTarget})`;
 }
 
-function createButton(text, isActive = false, variant = 'ghost') {
+function createButton(text, isActive = false, variant = 'ghost', options = {}) {
   const button = document.createElement('button');
-  button.textContent = text;
+  const {
+    icon = null,
+    iconAfter = false,
+    spinIconOnHover = false,
+    compact = false,
+    iconOnly = false,
+  } = options;
+  button.title = text;
+  button.setAttribute('aria-label', text);
   button.style.padding = variant === 'solid' ? '10px 18px' : '8px 14px';
   button.style.borderRadius = '12px';
   button.style.border = isActive ? '1px solid #ffffff' : '1px solid rgba(255,255,255,0.18)';
@@ -61,9 +69,133 @@ function createButton(text, isActive = false, variant = 'ghost') {
   button.style.color = '#ffffff';
   button.style.fontSize = 'calc(14px * var(--ui-scale, 1))';
   button.style.fontWeight = isActive || variant === 'solid' ? '600' : '500';
+  button.style.fontFamily = 'var(--font-ui)';
+  button.style.letterSpacing = '0.01em';
   button.style.cursor = 'pointer';
   button.style.backdropFilter = 'blur(6px)';
+  button.style.display = 'inline-flex';
+  button.style.alignItems = 'center';
+  button.style.justifyContent = 'center';
+  button.style.gap = '8px';
+  button.style.position = 'relative';
+  button.style.overflow = 'hidden';
+  button.style.transition =
+    'transform 140ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease, filter 180ms ease';
+  button.style.boxShadow =
+    variant === 'solid'
+      ? '0 10px 26px rgba(56,189,248,0.16)'
+      : compact
+        ? '0 8px 18px rgba(0,0,0,0.18)'
+        : 'none';
+
+  const label = document.createElement('span');
+  label.textContent = text;
+  label.style.position = 'relative';
+  label.style.zIndex = '1';
+  if (iconOnly) {
+    label.style.display = 'none';
+    button.style.padding = compact ? '8px' : '10px';
+    button.style.width = compact ? '40px' : '42px';
+    button.style.minWidth = compact ? '40px' : '42px';
+    button.style.height = compact ? '40px' : '42px';
+    button.style.borderRadius = '999px';
+    button.style.gap = '0';
+  }
+
+  const sheen = document.createElement('span');
+  sheen.style.position = 'absolute';
+  sheen.style.inset = '0';
+  sheen.style.background =
+    'linear-gradient(115deg, transparent 15%, rgba(255,255,255,0.12) 45%, transparent 75%)';
+  sheen.style.transform = 'translateX(-140%)';
+  sheen.style.transition = 'transform 320ms ease';
+  sheen.style.pointerEvents = 'none';
+
+  let iconEl = null;
+  if (icon) {
+    iconEl = icon;
+    iconEl.style.position = 'relative';
+    iconEl.style.zIndex = '1';
+    iconEl.style.transition = spinIconOnHover
+      ? 'transform 420ms ease, opacity 180ms ease'
+      : 'transform 180ms ease, opacity 180ms ease';
+  }
+
+  if (iconEl && !iconAfter) button.appendChild(iconEl);
+  button.appendChild(label);
+  if (iconEl && iconAfter) button.appendChild(iconEl);
+  button.appendChild(sheen);
+
+  button.addEventListener('mouseenter', () => {
+    button.style.transform = 'translateY(-1px)';
+    button.style.filter = 'brightness(1.04)';
+    button.style.boxShadow =
+      variant === 'solid'
+        ? '0 14px 30px rgba(56,189,248,0.24)'
+        : compact
+          ? '0 12px 24px rgba(0,0,0,0.24)'
+          : '0 8px 18px rgba(0,0,0,0.16)';
+    sheen.style.transform = 'translateX(140%)';
+    if (iconEl && spinIconOnHover) {
+      iconEl.style.transform = 'rotate(120deg) scale(1.08)';
+    }
+  });
+
+  button.addEventListener('mouseleave', () => {
+    button.style.transform = 'translateY(0)';
+    button.style.filter = 'none';
+    button.style.boxShadow =
+      variant === 'solid'
+        ? '0 10px 26px rgba(56,189,248,0.16)'
+        : compact
+          ? '0 8px 18px rgba(0,0,0,0.18)'
+          : 'none';
+    sheen.style.transition = 'none';
+    sheen.style.transform = 'translateX(-140%)';
+    void sheen.offsetWidth;
+    sheen.style.transition = 'transform 320ms ease';
+    if (iconEl) {
+      iconEl.style.transform = 'none';
+    }
+  });
+
+  button.addEventListener('mousedown', () => {
+    button.style.transform = 'translateY(1px) scale(0.99)';
+  });
+
+  button.addEventListener('mouseup', () => {
+    button.style.transform = 'translateY(-1px)';
+  });
+
   return button;
+}
+
+function createGearIcon() {
+  const icon = document.createElement('span');
+  icon.textContent = '\u2699';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.style.display = 'inline-flex';
+  icon.style.alignItems = 'center';
+  icon.style.justifyContent = 'center';
+  icon.style.width = '18px';
+  icon.style.height = '18px';
+  icon.style.fontSize = '15px';
+  icon.style.opacity = '0.92';
+  return icon;
+}
+
+function createSymbolIcon(symbol) {
+  const icon = document.createElement('span');
+  icon.textContent = symbol;
+  icon.setAttribute('aria-hidden', 'true');
+  icon.style.display = 'inline-flex';
+  icon.style.alignItems = 'center';
+  icon.style.justifyContent = 'center';
+  icon.style.width = '18px';
+  icon.style.height = '18px';
+  icon.style.fontSize = '14px';
+  icon.style.opacity = '0.92';
+  return icon;
 }
 
 function createSlider(label, value, onChange) {
@@ -106,11 +238,56 @@ function createSlider(label, value, onChange) {
   return wrapper;
 }
 
+function createCompactSlider(label, value, onChange) {
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'grid';
+  wrapper.style.gridTemplateColumns = '74px 1fr 36px';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.gap = '8px';
+
+  const text = document.createElement('div');
+  text.textContent = label;
+  text.style.fontSize = 'calc(11px * var(--ui-scale, 1))';
+  text.style.opacity = '0.78';
+  text.style.textAlign = 'left';
+
+  const range = document.createElement('input');
+  range.type = 'range';
+  range.min = '0';
+  range.max = '100';
+  range.value = String(Math.round((Number(value) || 0) * 100));
+  range.style.width = '100%';
+
+  const valueEl = document.createElement('div');
+  valueEl.textContent = `${range.value}%`;
+  valueEl.style.fontSize = 'calc(11px * var(--ui-scale, 1))';
+  valueEl.style.opacity = '0.72';
+  valueEl.style.textAlign = 'right';
+
+  range.addEventListener('input', () => {
+    valueEl.textContent = `${range.value}%`;
+    if (typeof onChange === 'function') {
+      onChange(Number(range.value) / 100);
+    }
+  });
+
+  wrapper.appendChild(text);
+  wrapper.appendChild(range);
+  wrapper.appendChild(valueEl);
+  return wrapper;
+}
+
 export function renderHome({
   rootEl,
   model,
   selectedMode = 'classic',
   settings,
+  variant = 'default',
+  compactSettingsOpen = false,
+  compactSettingsSection = 'menu',
+  onToggleCompactSettings,
+  onSelectCompactSettingsSection,
+  onBackCompactSettings,
   onModeChange,
   onPlay,
   onOpenFullscreen,
@@ -134,38 +311,48 @@ export function renderHome({
     0,
     Math.min(1, (Number(dailyInfo.progress) || 0) / Math.max(1, dailyInfo.target || 1))
   );
+  const isCompact = variant === 'compact';
 
   const container = document.createElement('div');
   container.style.display = 'flex';
   container.style.flexDirection = 'column';
   container.style.alignItems = 'stretch';
   container.style.textAlign = 'center';
-  container.style.gap = '18px';
-  container.style.padding = '28px 28px 24px';
+  container.style.gap = isCompact ? '14px' : '18px';
+  container.style.padding = isCompact ? '18px 18px 16px' : '28px 28px 24px';
   container.style.color = '#ffffff';
-  container.style.minWidth = '320px';
-  container.style.maxWidth = '400px';
-  container.style.borderRadius = '20px';
-  container.style.background = 'rgba(10,14,26,0.7)';
-  container.style.border = '1px solid rgba(255,255,255,0.08)';
-  container.style.boxShadow = '0 20px 60px rgba(0,0,0,0.45)';
+  container.style.minWidth = isCompact ? '0' : '320px';
+  container.style.width = isCompact ? 'min(100%, 372px)' : '';
+  container.style.maxWidth = isCompact ? '372px' : '400px';
+  container.style.borderRadius = isCompact ? '18px' : '20px';
+  container.style.background = isCompact ? 'rgba(8,12,26,0.82)' : 'rgba(10,14,26,0.7)';
+  container.style.border = isCompact ? '1px solid rgba(78,116,176,0.28)' : '1px solid rgba(255,255,255,0.08)';
+  container.style.boxShadow = isCompact
+    ? '0 18px 44px rgba(0,0,0,0.38)'
+    : '0 20px 60px rgba(0,0,0,0.45)';
   container.style.backdropFilter = 'blur(10px)';
+  container.style.position = 'relative';
 
   const header = document.createElement('div');
   header.style.display = 'flex';
   header.style.flexDirection = 'column';
   header.style.gap = '6px';
+  header.style.position = 'relative';
 
   const title = document.createElement('div');
   title.textContent = t('app.title');
-  title.style.fontSize = 'calc(28px * var(--ui-scale, 1))';
+  title.style.fontSize = isCompact ? 'calc(22px * var(--ui-scale, 1))' : 'calc(28px * var(--ui-scale, 1))';
   title.style.fontWeight = '700';
-  title.style.letterSpacing = '0.6px';
+  title.style.fontFamily = 'var(--font-display)';
+  title.style.letterSpacing = '0.02em';
+  title.style.lineHeight = '1';
 
   const subtitle = document.createElement('div');
   subtitle.textContent = t('app.subtitle');
-  subtitle.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  subtitle.style.fontSize = isCompact ? 'calc(11px * var(--ui-scale, 1))' : 'calc(12px * var(--ui-scale, 1))';
   subtitle.style.opacity = '0.65';
+  subtitle.style.letterSpacing = '0.01em';
+  subtitle.style.lineHeight = '1.35';
 
   header.appendChild(title);
   header.appendChild(subtitle);
@@ -174,6 +361,9 @@ export function renderHome({
   modeRow.style.display = 'flex';
   modeRow.style.gap = '8px';
   modeRow.style.justifyContent = 'center';
+  if (isCompact) {
+    modeRow.style.flexWrap = 'wrap';
+  }
 
   const modes = [
     { key: 'classic', label: t('mode.classic') },
@@ -191,34 +381,42 @@ export function renderHome({
 
   const stats = document.createElement('div');
   stats.style.display = 'grid';
-  stats.style.gridTemplateColumns = '1fr 1fr';
-  stats.style.columnGap = '20px';
-  stats.style.rowGap = '10px';
+  stats.style.gridTemplateColumns = isCompact ? 'repeat(3, minmax(0, 1fr))' : '1fr 1fr';
+  stats.style.columnGap = isCompact ? '8px' : '20px';
+  stats.style.rowGap = isCompact ? '8px' : '10px';
   stats.style.justifyItems = 'center';
-  stats.style.fontSize = 'calc(14px * var(--ui-scale, 1))';
-  stats.style.padding = '10px 0';
-  stats.innerHTML = `
-    <div>${t('stats.best_mode', { mode: selectedMode })}</div><div>${bestScore}</div>
-    <div>${t('stats.coins')}</div><div>${coins}</div>
-    <div>${t('stats.streak')}</div><div>${streak}</div>
-  `;
+  stats.style.fontSize = isCompact ? 'calc(12px * var(--ui-scale, 1))' : 'calc(14px * var(--ui-scale, 1))';
+  stats.style.padding = isCompact ? '0' : '10px 0';
+  if (isCompact) {
+    stats.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="opacity:0.6;">Best</span><strong>${bestScore}</strong></div>
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="opacity:0.6;">Coins</span><strong>${coins}</strong></div>
+      <div style="display:flex;flex-direction:column;gap:4px;"><span style="opacity:0.6;">Streak</span><strong>${streak}</strong></div>
+    `;
+  } else {
+    stats.innerHTML = `
+      <div>${t('stats.best_mode', { mode: selectedMode })}</div><div>${bestScore}</div>
+      <div>${t('stats.coins')}</div><div>${coins}</div>
+      <div>${t('stats.streak')}</div><div>${streak}</div>
+    `;
+  }
 
   const dailyBlock = document.createElement('div');
   dailyBlock.style.display = 'flex';
   dailyBlock.style.flexDirection = 'column';
-  dailyBlock.style.gap = '8px';
-  dailyBlock.style.padding = '12px 14px';
-  dailyBlock.style.borderRadius = '14px';
+  dailyBlock.style.gap = isCompact ? '6px' : '8px';
+  dailyBlock.style.padding = isCompact ? '10px 12px' : '12px 14px';
+  dailyBlock.style.borderRadius = isCompact ? '12px' : '14px';
   dailyBlock.style.background = 'rgba(255,255,255,0.04)';
   dailyBlock.style.border = '1px solid rgba(255,255,255,0.08)';
 
   const dailyTextEl = document.createElement('div');
   dailyTextEl.textContent = dailyText;
-  dailyTextEl.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  dailyTextEl.style.fontSize = isCompact ? 'calc(11px * var(--ui-scale, 1))' : 'calc(12px * var(--ui-scale, 1))';
   dailyTextEl.style.opacity = '0.85';
 
   const dailyBar = document.createElement('div');
-  dailyBar.style.height = '10px';
+  dailyBar.style.height = isCompact ? '8px' : '10px';
   dailyBar.style.borderRadius = '999px';
   dailyBar.style.background = 'rgba(255,255,255,0.12)';
   dailyBar.style.overflow = 'hidden';
@@ -236,11 +434,21 @@ export function renderHome({
 
   const actionRow = document.createElement('div');
   actionRow.style.display = 'flex';
-  actionRow.style.gap = '10px';
+  actionRow.style.gap = isCompact ? '8px' : '10px';
   actionRow.style.justifyContent = 'center';
+  actionRow.style.flexWrap = isCompact ? 'wrap' : 'nowrap';
 
-  const playButton = createButton(t('action.play'), true, 'solid');
-  playButton.style.fontSize = 'calc(15px * var(--ui-scale, 1))';
+  const playButton = createButton(t('action.play'), true, 'solid', {
+    compact: isCompact,
+  });
+  playButton.style.fontSize = isCompact ? 'calc(16px * var(--ui-scale, 1))' : 'calc(15px * var(--ui-scale, 1))';
+  if (isCompact) {
+    playButton.style.flex = '1 1 112px';
+    playButton.style.minHeight = '40px';
+    playButton.style.boxShadow = '0 10px 24px rgba(68, 196, 173, 0.24)';
+    playButton.style.background =
+      'linear-gradient(135deg, rgba(110,231,183,0.34), rgba(56,189,248,0.28))';
+  }
   playButton.addEventListener('click', () => {
     if (typeof onPlay === 'function') onPlay();
   });
@@ -249,7 +457,15 @@ export function renderHome({
     typeof onOpenFullscreen === 'function'
       ? t('action.open_fullscreen')
       : t('action.minimize');
-  const secondaryButton = createButton(secondaryButtonLabel);
+  const secondaryButton = createButton(secondaryButtonLabel, false, 'ghost', {
+    compact: isCompact,
+  });
+  if (isCompact) {
+    secondaryButton.style.flex = '1 1 150px';
+    secondaryButton.style.minHeight = '40px';
+    secondaryButton.style.borderColor = 'rgba(123, 155, 217, 0.28)';
+    secondaryButton.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))';
+  }
   secondaryButton.addEventListener('click', () => {
     if (typeof onOpenFullscreen === 'function') {
       onOpenFullscreen();
@@ -263,40 +479,85 @@ export function renderHome({
     if (typeof onShop === 'function') onShop();
   });
 
-  const settingsButton = createButton(t('action.settings'));
+  const settingsButton = createButton(t('action.settings'), false, 'ghost', {
+    icon: createGearIcon(),
+    spinIconOnHover: true,
+    compact: isCompact,
+    iconOnly: true,
+  });
+  if (isCompact) {
+    settingsButton.style.minHeight = '40px';
+    settingsButton.style.borderColor = 'rgba(120, 143, 196, 0.24)';
+    settingsButton.style.background =
+      'linear-gradient(180deg, rgba(16,24,44,0.86), rgba(12,18,34,0.94))';
+    settingsButton.style.position = 'absolute';
+    settingsButton.style.top = '0';
+    settingsButton.style.right = '0';
+  }
 
   actionRow.appendChild(playButton);
   if (typeof onOpenFullscreen === 'function' || typeof onMinimize === 'function') {
     actionRow.appendChild(secondaryButton);
   }
-  actionRow.appendChild(shopButton);
-  actionRow.appendChild(settingsButton);
+  if (typeof onShop === 'function') {
+    actionRow.appendChild(shopButton);
+  }
+  if (!isCompact) {
+    actionRow.appendChild(settingsButton);
+  }
 
   const settingsPanel = document.createElement('div');
   settingsPanel.style.display = 'none';
   settingsPanel.style.flexDirection = 'column';
   settingsPanel.style.gap = '12px';
+  settingsPanel.style.paddingTop = isCompact ? '2px' : '0';
+  if (isCompact) {
+    const compactMenuView = compactSettingsSection === 'menu';
+    settingsPanel.style.position = 'absolute';
+    settingsPanel.style.top = '42px';
+    settingsPanel.style.right = '12px';
+    settingsPanel.style.left = '12px';
+    settingsPanel.style.bottom = compactMenuView ? 'auto' : '20px';
+    settingsPanel.style.padding = '12px';
+    settingsPanel.style.borderRadius = '18px';
+    settingsPanel.style.background = 'rgba(10,14,26,0.97)';
+    settingsPanel.style.border = '1px solid rgba(120, 143, 196, 0.24)';
+    settingsPanel.style.boxShadow = '0 20px 44px rgba(0,0,0,0.42)';
+    settingsPanel.style.zIndex = '8';
+    settingsPanel.style.justifyContent = 'flex-start';
+    settingsPanel.style.alignItems = 'stretch';
+    settingsPanel.style.overflow = 'hidden';
+  }
 
   const togglesRow = document.createElement('div');
-  togglesRow.style.display = 'flex';
-  togglesRow.style.gap = '8px';
+  togglesRow.style.display = 'grid';
+  togglesRow.style.gridTemplateColumns = isCompact ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))';
+  togglesRow.style.gap = isCompact ? '6px' : '8px';
   togglesRow.style.justifyContent = 'center';
 
   const sfxButton = createButton(
-    `${t('settings.sfx')} ${settings?.sfx ? t('common.on') : t('common.off')}`,
-    settings?.sfx
+    isCompact ? t('settings.sfx') : `${t('settings.sfx')} ${settings?.sfx ? t('common.on') : t('common.off')}`,
+    settings?.sfx,
+    'ghost',
+    { compact: isCompact }
   );
   const musicButton = createButton(
-    `${t('settings.music')} ${settings?.music ? t('common.on') : t('common.off')}`,
-    settings?.music
+    isCompact ? t('settings.music') : `${t('settings.music')} ${settings?.music ? t('common.on') : t('common.off')}`,
+    settings?.music,
+    'ghost',
+    { compact: isCompact }
   );
   const vibeButton = createButton(
-    `${t('settings.vibe')} ${settings?.vibe ? t('common.on') : t('common.off')}`,
-    settings?.vibe
+    isCompact ? t('settings.vibe') : `${t('settings.vibe')} ${settings?.vibe ? t('common.on') : t('common.off')}`,
+    settings?.vibe,
+    'ghost',
+    { compact: isCompact }
   );
   const muteButton = createButton(
-    `${t('settings.mute')} ${settings?.muteAudio ? t('common.on') : t('common.off')}`,
-    settings?.muteAudio
+    isCompact ? t('settings.mute') : `${t('settings.mute')} ${settings?.muteAudio ? t('common.on') : t('common.off')}`,
+    settings?.muteAudio,
+    'ghost',
+    { compact: isCompact }
   );
 
   sfxButton.addEventListener('click', () => {
@@ -320,17 +581,26 @@ export function renderHome({
   togglesRow.appendChild(muteButton);
 
   const accessibilityRow = document.createElement('div');
-  accessibilityRow.style.display = 'flex';
-  accessibilityRow.style.gap = '8px';
+  accessibilityRow.style.display = 'grid';
+  accessibilityRow.style.gridTemplateColumns = isCompact ? '1fr 1fr' : '1fr 1fr';
+  accessibilityRow.style.gap = isCompact ? '6px' : '8px';
   accessibilityRow.style.justifyContent = 'center';
 
   const reducedMotionButton = createButton(
-    `${t('settings.reduced_motion')} ${settings?.reducedMotion ? t('common.on') : t('common.off')}`,
-    settings?.reducedMotion
+    isCompact
+      ? t('settings.reduced_motion')
+      : `${t('settings.reduced_motion')} ${settings?.reducedMotion ? t('common.on') : t('common.off')}`,
+    settings?.reducedMotion,
+    'ghost',
+    { compact: isCompact }
   );
   const contrastButton = createButton(
-    `${t('settings.high_contrast')} ${settings?.highContrast ? t('common.on') : t('common.off')}`,
-    settings?.highContrast
+    isCompact
+      ? t('settings.high_contrast')
+      : `${t('settings.high_contrast')} ${settings?.highContrast ? t('common.on') : t('common.off')}`,
+    settings?.highContrast,
+    'ghost',
+    { compact: isCompact }
   );
 
   reducedMotionButton.addEventListener('click', () => {
@@ -351,17 +621,18 @@ export function renderHome({
   const difficultyBlock = document.createElement('div');
   difficultyBlock.style.display = 'flex';
   difficultyBlock.style.flexDirection = 'column';
-  difficultyBlock.style.gap = '8px';
+  difficultyBlock.style.gap = isCompact ? '4px' : '8px';
 
   const difficultyLabel = document.createElement('div');
   difficultyLabel.textContent = t('settings.difficulty');
-  difficultyLabel.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  difficultyLabel.style.fontSize = isCompact ? 'calc(10px * var(--ui-scale, 1))' : 'calc(12px * var(--ui-scale, 1))';
   difficultyLabel.style.opacity = '0.75';
 
   const difficultyRow = document.createElement('div');
   difficultyRow.style.display = 'flex';
-  difficultyRow.style.gap = '8px';
+  difficultyRow.style.gap = isCompact ? '6px' : '8px';
   difficultyRow.style.justifyContent = 'center';
+  difficultyRow.style.flexWrap = isCompact ? 'wrap' : 'nowrap';
 
   const difficulties = [
     { key: 'easy', label: t('difficulty.easy') },
@@ -370,10 +641,16 @@ export function renderHome({
   ];
 
   difficulties.forEach((diff) => {
-    const btn = createButton(diff.label, settings?.difficulty === diff.key);
+    const btn = createButton(diff.label, settings?.difficulty === diff.key, 'ghost', {
+      compact: isCompact,
+    });
     btn.addEventListener('click', () => {
       if (typeof onSettingsChange === 'function') onSettingsChange({ difficulty: diff.key });
     });
+    if (isCompact) {
+      btn.style.padding = '6px 10px';
+      btn.style.fontSize = 'calc(13px * var(--ui-scale, 1))';
+    }
     difficultyRow.appendChild(btn);
   });
 
@@ -383,17 +660,18 @@ export function renderHome({
   const musicStyleBlock = document.createElement('div');
   musicStyleBlock.style.display = 'flex';
   musicStyleBlock.style.flexDirection = 'column';
-  musicStyleBlock.style.gap = '8px';
+  musicStyleBlock.style.gap = isCompact ? '4px' : '8px';
 
   const musicStyleLabel = document.createElement('div');
   musicStyleLabel.textContent = t('settings.music_style');
-  musicStyleLabel.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  musicStyleLabel.style.fontSize = isCompact ? 'calc(10px * var(--ui-scale, 1))' : 'calc(12px * var(--ui-scale, 1))';
   musicStyleLabel.style.opacity = '0.75';
 
   const musicStyleRow = document.createElement('div');
   musicStyleRow.style.display = 'flex';
-  musicStyleRow.style.gap = '8px';
+  musicStyleRow.style.gap = isCompact ? '6px' : '8px';
   musicStyleRow.style.justifyContent = 'center';
+  musicStyleRow.style.flexWrap = isCompact ? 'wrap' : 'nowrap';
 
   const styles = [
     { key: 'chill', label: t('music_style.chill') },
@@ -402,10 +680,16 @@ export function renderHome({
   ];
 
   styles.forEach((style) => {
-    const btn = createButton(style.label, settings?.musicStyle === style.key);
+    const btn = createButton(style.label, settings?.musicStyle === style.key, 'ghost', {
+      compact: isCompact,
+    });
     btn.addEventListener('click', () => {
       if (typeof onSettingsChange === 'function') onSettingsChange({ musicStyle: style.key });
     });
+    if (isCompact) {
+      btn.style.padding = '6px 10px';
+      btn.style.fontSize = 'calc(13px * var(--ui-scale, 1))';
+    }
     musicStyleRow.appendChild(btn);
   });
 
@@ -421,39 +705,248 @@ export function renderHome({
     if (typeof onReset === 'function') onReset();
   });
 
-  resetRow.appendChild(resetButton);
-
-  settingsPanel.appendChild(togglesRow);
+  if (typeof onReset === 'function') {
+    resetRow.appendChild(resetButton);
+  }
 
   const volumeBlock = document.createElement('div');
   volumeBlock.style.display = 'flex';
   volumeBlock.style.flexDirection = 'column';
-  volumeBlock.style.gap = '8px';
+  volumeBlock.style.gap = isCompact ? '4px' : '8px';
   volumeBlock.style.alignItems = 'center';
+  if (isCompact) {
+    volumeBlock.style.alignItems = 'stretch';
+  }
 
-  const sfxSlider = createSlider(t('settings.sfx_volume'), settings?.sfxVolume ?? 0.8, (value) => {
+  const sliderFactory = isCompact ? createCompactSlider : createSlider;
+  const sfxSlider = sliderFactory(t('settings.sfx_volume'), settings?.sfxVolume ?? 0.8, (value) => {
     if (typeof onSettingsChange === 'function') onSettingsChange({ sfxVolume: value });
   });
-  const musicSlider = createSlider(t('settings.music_volume'), settings?.musicVolume ?? 0.4, (value) => {
+  const musicSlider = sliderFactory(t('settings.music_volume'), settings?.musicVolume ?? 0.4, (value) => {
     if (typeof onSettingsChange === 'function') onSettingsChange({ musicVolume: value });
   });
 
   volumeBlock.appendChild(sfxSlider);
   volumeBlock.appendChild(musicSlider);
-  settingsPanel.appendChild(volumeBlock);
-  settingsPanel.appendChild(accessibilityRow);
-  settingsPanel.appendChild(difficultyBlock);
-  settingsPanel.appendChild(musicStyleBlock);
-  settingsPanel.appendChild(resetRow);
+  if (!isCompact) {
+    const settingsBody = document.createElement('div');
+    settingsBody.style.display = 'flex';
+    settingsBody.style.flexDirection = 'column';
+    settingsBody.style.gap = '12px';
+    settingsBody.style.flex = '1 1 auto';
+    settingsBody.style.minHeight = '0';
+
+    settingsBody.appendChild(togglesRow);
+    settingsBody.appendChild(volumeBlock);
+    settingsBody.appendChild(accessibilityRow);
+    settingsBody.appendChild(difficultyBlock);
+    settingsBody.appendChild(musicStyleBlock);
+    if (typeof onReset === 'function') {
+      settingsBody.appendChild(resetRow);
+    }
+    settingsPanel.appendChild(settingsBody);
+  }
 
   let settingsOpen = false;
+  if (isCompact) {
+    settingsOpen = !!compactSettingsOpen;
+    settingsPanel.style.display = settingsOpen ? 'flex' : 'none';
+  }
   settingsButton.addEventListener('click', () => {
+    if (isCompact) {
+      if (typeof onToggleCompactSettings === 'function') onToggleCompactSettings();
+      return;
+    }
     settingsOpen = !settingsOpen;
     settingsPanel.style.display = settingsOpen ? 'flex' : 'none';
   });
 
+  if (isCompact) {
+    const settingsHeader = document.createElement('div');
+    settingsHeader.style.display = 'flex';
+    settingsHeader.style.alignItems = 'center';
+    settingsHeader.style.justifyContent = 'space-between';
+    settingsHeader.style.gap = '8px';
+    settingsHeader.style.padding = '0 2px 2px';
+
+    const headerLeft = document.createElement('div');
+    headerLeft.style.display = 'flex';
+    headerLeft.style.alignItems = 'center';
+    headerLeft.style.gap = '10px';
+
+    const settingsTitle = document.createElement('div');
+    settingsTitle.textContent =
+      compactSettingsSection === 'audio'
+        ? 'Audio'
+        : compactSettingsSection === 'accessibility'
+          ? 'Accessibility'
+          : compactSettingsSection === 'gameplay'
+            ? 'Gameplay'
+            : t('action.settings');
+    settingsTitle.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+    settingsTitle.style.fontWeight = '700';
+    settingsTitle.style.letterSpacing = '0.3px';
+    settingsTitle.style.textAlign = 'left';
+    settingsTitle.style.lineHeight = '1';
+
+    const closeSettingsButton = createButton(
+      compactSettingsSection === 'menu' ? t('action.home') : 'Back',
+      false,
+      'ghost',
+      {
+      icon: createSymbolIcon('\u2190'),
+      compact: true,
+      iconOnly: true,
+      }
+    );
+    closeSettingsButton.style.width = '32px';
+    closeSettingsButton.style.minWidth = '32px';
+    closeSettingsButton.style.height = '32px';
+    closeSettingsButton.style.borderColor = 'rgba(120, 143, 196, 0.24)';
+    closeSettingsButton.style.background =
+      'linear-gradient(180deg, rgba(18,26,46,0.86), rgba(12,18,34,0.94))';
+    closeSettingsButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (compactSettingsSection !== 'menu') {
+        if (typeof onBackCompactSettings === 'function') {
+          onBackCompactSettings();
+        }
+      } else if (typeof onToggleCompactSettings === 'function') {
+        onToggleCompactSettings();
+      } else {
+        settingsOpen = false;
+        settingsPanel.style.display = 'none';
+      }
+    });
+
+    headerLeft.appendChild(closeSettingsButton);
+    headerLeft.appendChild(settingsTitle);
+    settingsHeader.appendChild(headerLeft);
+    settingsPanel.prepend(settingsHeader);
+    settingsHeader.style.marginBottom = '4px';
+  }
+
+  if (isCompact) {
+    const settingsBody = document.createElement('div');
+    settingsBody.dataset.role = 'settings-body';
+    settingsBody.style.display = 'flex';
+    settingsBody.style.flexDirection = 'column';
+    settingsBody.style.gap = '10px';
+    settingsBody.style.flex = compactSettingsSection === 'menu' ? '0 0 auto' : '1 1 auto';
+
+    const sectionMenu = document.createElement('div');
+    sectionMenu.style.display = compactSettingsSection === 'menu' ? 'grid' : 'none';
+    sectionMenu.style.gridTemplateColumns = '1fr';
+    sectionMenu.style.gap = '10px';
+
+    const makeSectionButton = (label, icon, key, description) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+      btn.style.display = 'grid';
+      btn.style.gridTemplateColumns = '28px 1fr';
+      btn.style.alignItems = 'center';
+      btn.style.gap = '12px';
+      btn.style.width = '100%';
+      btn.style.padding = '14px 14px 13px';
+      btn.style.borderRadius = '14px';
+      btn.style.border = '1px solid rgba(255,255,255,0.14)';
+      btn.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))';
+      btn.style.color = '#ffffff';
+      btn.style.cursor = 'pointer';
+      btn.style.textAlign = 'left';
+      btn.style.transition = 'transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease';
+
+      const iconEl = createSymbolIcon(icon);
+      iconEl.style.width = '24px';
+      iconEl.style.height = '24px';
+      iconEl.style.fontSize = '16px';
+
+      const textWrap = document.createElement('div');
+      textWrap.style.display = 'flex';
+      textWrap.style.flexDirection = 'column';
+      textWrap.style.gap = '2px';
+
+      const titleEl = document.createElement('div');
+      titleEl.textContent = label;
+      titleEl.style.fontSize = '15px';
+      titleEl.style.fontWeight = '600';
+      titleEl.style.lineHeight = '1.2';
+
+      const descEl = document.createElement('div');
+      descEl.textContent = description;
+      descEl.style.fontSize = '11px';
+      descEl.style.opacity = '0.68';
+      descEl.style.lineHeight = '1.25';
+
+      textWrap.appendChild(titleEl);
+      textWrap.appendChild(descEl);
+      btn.appendChild(iconEl);
+      btn.appendChild(textWrap);
+
+      btn.addEventListener('mouseenter', () => {
+        btn.style.transform = 'translateY(-1px)';
+        btn.style.borderColor = 'rgba(120, 143, 196, 0.28)';
+        btn.style.boxShadow = '0 12px 26px rgba(0,0,0,0.24)';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.transform = 'translateY(0)';
+        btn.style.borderColor = 'rgba(255,255,255,0.14)';
+        btn.style.boxShadow = 'none';
+      });
+      btn.addEventListener('mousedown', () => {
+        btn.style.transform = 'translateY(1px)';
+      });
+      btn.addEventListener('mouseup', () => {
+        btn.style.transform = 'translateY(-1px)';
+      });
+      btn.addEventListener('click', () => {
+        if (typeof onSelectCompactSettingsSection === 'function') {
+          onSelectCompactSettingsSection(key);
+        }
+      });
+      return btn;
+    };
+
+    sectionMenu.appendChild(makeSectionButton('Audio', '\u266b', 'audio', 'sound, mute, music style'));
+    sectionMenu.appendChild(makeSectionButton('Accessibility', '\u25d0', 'accessibility', 'motion and contrast'));
+    sectionMenu.appendChild(makeSectionButton('Gameplay', '\u25b6', 'gameplay', 'difficulty and pace'));
+
+    const sectionDetail = document.createElement('div');
+    sectionDetail.style.display = compactSettingsSection === 'menu' ? 'none' : 'flex';
+    sectionDetail.style.flexDirection = 'column';
+    sectionDetail.style.gap = '10px';
+    sectionDetail.style.flex = '1 1 auto';
+
+    if (compactSettingsSection === 'audio') {
+      sectionDetail.appendChild(togglesRow);
+      sectionDetail.appendChild(volumeBlock);
+      sectionDetail.appendChild(musicStyleBlock);
+    } else if (compactSettingsSection === 'accessibility') {
+      sectionDetail.appendChild(accessibilityRow);
+    } else if (compactSettingsSection === 'gameplay') {
+      sectionDetail.appendChild(difficultyBlock);
+    }
+
+    settingsBody.appendChild(sectionMenu);
+    settingsBody.appendChild(sectionDetail);
+
+    const existingBody = settingsPanel.querySelector('[data-role="settings-body"]');
+    if (existingBody) {
+      existingBody.remove();
+    }
+    settingsPanel.appendChild(settingsBody);
+  }
+
+  if (isCompact) {
+    header.appendChild(settingsButton);
+  }
+
   container.appendChild(header);
-  container.appendChild(modeRow);
+  if (typeof onModeChange === 'function') {
+    container.appendChild(modeRow);
+  }
   container.appendChild(stats);
   container.appendChild(dailyBlock);
   container.appendChild(actionRow);
@@ -655,12 +1148,40 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
     if (equipped) label = t('action.equipped');
     else if (owned) label = t('action.equip');
 
-    const button = createButton(label, equipped, equipped ? 'solid' : 'ghost');
+    const buttonIcon = equipped
+      ? createSymbolIcon('\u2713')
+      : owned
+        ? createSymbolIcon('\u2726')
+        : createSymbolIcon('+');
+    const button = createButton(label, equipped, equipped ? 'solid' : 'ghost', {
+      icon: buttonIcon,
+      compact: true,
+      iconOnly: true,
+    });
     const canBuy = owned || coins >= item.price;
     if (!canBuy) {
       button.style.opacity = '0.5';
       button.style.cursor = 'not-allowed';
     }
+    if (owned && !equipped) {
+      button.style.borderColor = 'rgba(110,231,183,0.28)';
+      button.style.background = 'rgba(110,231,183,0.08)';
+    }
+    if (equipped) {
+      button.style.boxShadow = '0 12px 24px rgba(56,189,248,0.22)';
+    }
+
+    row.style.transition = 'transform 160ms ease, border-color 180ms ease, background 180ms ease';
+    row.addEventListener('mouseenter', () => {
+      row.style.transform = 'translateY(-1px)';
+      row.style.borderColor = 'rgba(123, 155, 217, 0.28)';
+      row.style.background = 'rgba(255,255,255,0.06)';
+    });
+    row.addEventListener('mouseleave', () => {
+      row.style.transform = 'translateY(0)';
+      row.style.borderColor = 'rgba(255,255,255,0.08)';
+      row.style.background = 'rgba(255,255,255,0.04)';
+    });
 
     button.addEventListener('click', () => {
       if (!canBuy) return;
@@ -693,7 +1214,11 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
   actions.style.display = 'flex';
   actions.style.justifyContent = 'center';
 
-  const backButton = createButton(t('action.back'));
+  const backButton = createButton(t('action.back'), false, 'ghost', {
+    icon: createSymbolIcon('\u2190'),
+    compact: true,
+    iconOnly: true,
+  });
   backButton.addEventListener('click', () => {
     if (typeof onBack === 'function') onBack();
   });
@@ -709,7 +1234,6 @@ export function renderShop({ rootEl, model, onBuy, onBack }) {
   drawPreview();
   startPreviewLoop();
 }
-
 
 
 
