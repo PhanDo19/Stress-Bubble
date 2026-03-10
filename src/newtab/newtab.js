@@ -9,12 +9,14 @@ import {
   loadStreak,
   loadDaily,
   loadShop,
+  loadProgression,
   loadSettings,
   loadTutorial,
   loadAchievements,
   save,
   saveBestScore,
   saveShop,
+  saveProgression,
   saveSettings,
   saveTutorial,
   saveAchievements,
@@ -24,7 +26,7 @@ import { getTodayKey, getDailyChallenge, evaluateDailyProgress } from '../shared
 import { updateStreak } from '../shared/systems/streakSystem.js';
 import { coinsForRun } from '../shared/systems/coinSystem.js';
 import { setupHiDPICanvas } from '../shared/render/canvasScale.js';
-import { buyItem } from '../shared/ui/shopSystem.js';
+import { buyItem, normalizeShopState, pickShopState } from '../shared/ui/shopSystem.js';
 import { createAudioManager } from '../shared/audio/audioManager.js';
 import { evaluateAchievements } from '../shared/systems/achievementSystem.js';
 import { computeRank } from '../shared/systems/rankSystem.js';
@@ -64,13 +66,14 @@ function createLayout() {
 }
 
 async function loadModel() {
-  const [bestScores, coins, streak, daily, shop, settings, tutorialSeen, achievements] =
+  const [bestScores, coins, streak, daily, shop, progression, settings, tutorialSeen, achievements] =
     await Promise.all([
     loadBestScores(),
     loadCoins(),
     loadStreak(),
     loadDaily(),
     loadShop(),
+    loadProgression(),
     loadSettings(),
     loadTutorial(),
     loadAchievements(),
@@ -82,20 +85,39 @@ async function loadModel() {
     dailyData = getDailyChallenge(todayKey);
   }
 
-  const ownedSkins = Array.isArray(shop?.ownedSkins) ? shop.ownedSkins : ['skin_classic'];
-  const selectedSkin = shop?.selectedSkin || 'skin_classic';
+  const shopState = normalizeShopState(shop || {});
+  const normalizedSettings = normalizeSettings({
+    ...(settings || {}),
+    selectedSkin: shopState.selectedSkin,
+    selectedBackground: shopState.selectedBackground,
+    selectedAudioPack: shopState.selectedAudioPack,
+  });
 
   return {
     bestScores,
     coins,
     streak,
     daily: dailyData,
-    ownedSkins,
-    selectedSkin,
-    settings: normalizeSettings(settings),
+    ownedSkins: shopState.ownedSkins,
+    selectedSkin: shopState.selectedSkin,
+    ownedBackgrounds: shopState.ownedBackgrounds,
+    selectedBackground: shopState.selectedBackground,
+    ownedAudioPacks: shopState.ownedAudioPacks,
+    selectedAudioPack: shopState.selectedAudioPack,
+    progression,
+    settings: normalizedSettings,
     tutorialSeen: !!tutorialSeen,
     achievements: Array.isArray(achievements) ? achievements : [],
   };
+}
+
+function syncLoadoutIntoSettings(model) {
+  model.settings = normalizeSettings({
+    ...(model.settings || {}),
+    selectedSkin: model.selectedSkin || 'skin_classic',
+    selectedBackground: model.selectedBackground || 'bg_midnight',
+    selectedAudioPack: model.selectedAudioPack || 'audio_classic',
+  });
 }
 
 function buildCopyText(result) {
@@ -104,7 +126,9 @@ function buildCopyText(result) {
 
 async function setup() {
   let model = await loadModel();
+  syncLoadoutIntoSettings(model);
   let selectedMode = 'classic';
+  let shopCategory = 'bubble';
   let lastResult = null;
   let lastPersonalBest = false;
   const audio = createAudioManager();
@@ -113,7 +137,7 @@ async function setup() {
   const { canvas, overlay } = createLayout();
   const { ctx } = setupHiDPICanvas(canvas);
 
-  audio.setSettings(model.settings);
+  audio.setSettings({ ...model.settings, audioPack: model.selectedAudioPack });
 
   const engine = createGameEngine({
     renderer: { renderFrame },
@@ -121,6 +145,18 @@ async function setup() {
     ctx,
     config,
   });
+
+  function applyOwnedPresentation() {
+    engine.setLoadout({
+      selectedSkin: model.selectedSkin || 'skin_classic',
+      backgroundTheme: model.selectedBackground || 'bg_midnight',
+      selectedAudioPack: model.selectedAudioPack || 'audio_classic',
+    });
+    audio.setSettings({ ...model.settings, audioPack: model.selectedAudioPack });
+    if (engine.state !== 'PLAYING' && engine.state !== 'PAUSED') {
+      engine.init();
+    }
+  }
 
   function showHome() {
     overlay.style.pointerEvents = 'auto';
@@ -146,7 +182,7 @@ async function setup() {
         model.settings = normalizeSettings({ ...model.settings, ...patch });
         syncGameConfig(config, model.settings);
         await saveSettings(model.settings);
-        audio.setSettings(model.settings);
+        audio.setSettings({ ...model.settings, audioPack: model.selectedAudioPack });
         showHome();
       },
       onReset: async () => {
@@ -155,25 +191,32 @@ async function setup() {
         await clearAll();
         model = await loadModel();
         syncGameConfig(config, model.settings);
-        audio.setSettings(model.settings);
-        engine.init();
+        applyOwnedPresentation();
         showHome();
       },
     });
   }
 
-  function showShop() {
+  function showShop(category = shopCategory) {
+    shopCategory = category;
+    const todayKey = getTodayKey();
     overlay.style.pointerEvents = 'auto';
     renderShop({
       rootEl: overlay,
       model,
+      activeCategory: shopCategory,
+      onCategoryChange: (nextCategory) => showShop(nextCategory),
+      todayKey,
       onBuy: async (itemId) => {
-        const result = buyItem(model, itemId);
+        const result = buyItem(model, itemId, todayKey);
         if (!result.ok) return;
         model = result.model;
+        syncLoadoutIntoSettings(model);
         await save({ coins: model.coins });
-        await saveShop({ ownedSkins: model.ownedSkins, selectedSkin: model.selectedSkin });
-        showShop();
+        await saveShop(pickShopState(model));
+        await saveSettings(model.settings);
+        applyOwnedPresentation();
+        showShop(shopCategory);
       },
       onBack: () => showHome(),
     });
@@ -214,11 +257,12 @@ async function setup() {
 
   async function finishRun(runStats) {
     const rankInfo = computeRank(runStats.score);
-    const coinsEarned = coinsForRun(runStats.score);
-
-    model.coins += coinsEarned;
-
+    const coinsEarned = coinsForRun(runStats.score, runStats);
     const todayKey = getTodayKey();
+    const firstWinBonus = model.progression?.firstWinDateKey === todayKey ? 0 : 60;
+
+    model.coins += coinsEarned + firstWinBonus;
+
     model.streak = updateStreak(model.streak, todayKey, true);
     const streakReward = Number(model.streak?.rewardCoins) || 0;
     if (streakReward > 0) {
@@ -227,6 +271,14 @@ async function setup() {
     }
 
     model.daily = evaluateDailyProgress(model.daily, runStats);
+    model.progression = {
+      ...(model.progression || {}),
+      firstWinDateKey: todayKey,
+      runsPlayed: Number(model.progression?.runsPlayed) + 1,
+      totalPlayMs: Number(model.progression?.totalPlayMs) + (Number(runStats.durationMs) || 0),
+      lifetimeGoldenCount: Number(model.progression?.lifetimeGoldenCount) + (Number(runStats.goldenCount) || 0),
+      bestComboEver: Math.max(Number(model.progression?.bestComboEver) || 0, Number(runStats.maxCombo) || 0),
+    };
 
     const modeKey = runStats.mode || selectedMode || 'classic';
     const previousBest = model.bestScores?.[modeKey] ?? 0;
@@ -241,16 +293,19 @@ async function setup() {
       streak: model.streak,
       daily: model.daily,
       bestScores: model.bestScores,
+      progression: model.progression,
     });
     await saveAchievements(model.achievements);
+    await saveProgression(model.progression);
 
     const result = {
       score: runStats.score,
       rank: rankInfo.rank,
       nearMiss: rankInfo.nearMiss,
       rankProgress: rankInfo.rankProgress,
-      coinsEarned,
+      coinsEarned: coinsEarned + firstWinBonus,
       mode: runStats.mode,
+      firstWinBonus,
       achievementsUnlocked: achievementResult.newlyUnlocked,
       runStats: {
         pops: runStats.pops || 0,
@@ -273,7 +328,12 @@ async function setup() {
     }
     overlay.innerHTML = '';
     overlay.style.pointerEvents = 'none';
-    engine.selectedSkin = model.selectedSkin || 'skin_classic';
+    engine.setLoadout({
+      selectedSkin: model.selectedSkin || 'skin_classic',
+      backgroundTheme: model.selectedBackground || 'bg_midnight',
+      selectedAudioPack: model.selectedAudioPack || 'audio_classic',
+    });
+    audio.setSettings({ ...model.settings, audioPack: model.selectedAudioPack });
     audio.unlock();
     engine.start(mode);
   }
@@ -304,7 +364,7 @@ async function setup() {
     audio.playLowTimeWarning();
   });
 
-  engine.init();
+  applyOwnedPresentation();
   showHome();
 }
 

@@ -13,6 +13,8 @@ const hudAnim = {
   scorePop: 0,
   comboMeter: 0,
   comboPulse: 0,
+  comboStatePop: 0,
+  prevComboState: '',
 };
 
 function clamp01(value) {
@@ -21,6 +23,54 @@ function clamp01(value) {
 
 function smoothStep(current, target, factor) {
   return current + (target - current) * clamp01(factor);
+}
+
+function getComboTier(comboCount, multiplier) {
+  if (multiplier >= 10 || comboCount >= 21) {
+    return {
+      scale: 1.28,
+      color: '#c084fc',
+      glow: 'rgba(192,132,252,0.78)',
+      meter: 'rgba(192,132,252,0.95)',
+      pulseBoost: 0.09,
+      accent: 'rgba(216,180,254,0.2)',
+    };
+  }
+  if (multiplier >= 8 || comboCount >= 13) {
+    return {
+      scale: 1.22,
+      color: '#fca5a5',
+      glow: 'rgba(248,113,113,0.74)',
+      meter: 'rgba(248,113,113,0.92)',
+      pulseBoost: 0.07,
+      accent: 'rgba(252,165,165,0.18)',
+    };
+  }
+  if (comboCount >= 5) {
+    return {
+      scale: 1.12,
+      color: '#fde047',
+      glow: 'rgba(251,191,36,0.6)',
+      meter: 'rgba(251,191,36,0.9)',
+      pulseBoost: 0.055,
+      accent: 'rgba(253,224,71,0.15)',
+    };
+  }
+  return {
+    scale: 1.05,
+    color: '#a7f3d0',
+    glow: 'rgba(110,231,183,0.6)',
+    meter: 'rgba(110,231,183,0.9)',
+    pulseBoost: 0.05,
+    accent: 'rgba(167,243,208,0.14)',
+  };
+}
+
+function getComboStateLabel(comboCount, multiplier) {
+  if (multiplier >= 10 || comboCount >= 21) return 'OVERDRIVE';
+  if (multiplier >= 8 || comboCount >= 13) return 'FRENZY';
+  if (comboCount >= 5) return 'RUSH';
+  return '';
 }
 
 export function renderHud(ctx, canvas, state) {
@@ -54,6 +104,8 @@ export function renderHud(ctx, canvas, state) {
     hudAnim.scorePop = 0;
     hudAnim.comboMeter = 0;
     hudAnim.comboPulse = 0;
+    hudAnim.comboStatePop = 0;
+    hudAnim.prevComboState = '';
     hudAnim.lastMs = nowMs;
   }
 
@@ -63,9 +115,12 @@ export function renderHud(ctx, canvas, state) {
   const scoreDiff = score - hudAnim.displayScore;
   hudAnim.displayScore = reducedMotion ? score : smoothStep(hudAnim.displayScore, score, dt * 10);
   if (Math.abs(scoreDiff) < 0.5 || reducedMotion) hudAnim.displayScore = score;
-  if (!reducedMotion && score > hudAnim.prevScore) hudAnim.scorePop = 1;
+  if (!reducedMotion && score > hudAnim.prevScore) {
+    const scoreDelta = Math.max(0, score - hudAnim.prevScore);
+    hudAnim.scorePop = Math.min(1.35, 0.45 + scoreDelta / 90);
+  }
   hudAnim.prevScore = score;
-  hudAnim.scorePop = reducedMotion ? 0 : Math.max(0, hudAnim.scorePop - dt * 3.2);
+  hudAnim.scorePop = reducedMotion ? 0 : Math.max(0, hudAnim.scorePop - dt * 2.8);
 
   const rawComboMeter =
     comboCount >= 2 ? clamp01((combo.timeLeftMs || 0) / comboWindowMs) : 0;
@@ -88,25 +143,20 @@ export function renderHud(ctx, canvas, state) {
   ctx.restore();
 
   if (comboCount >= 2) {
-    let tierScale = 1.05;
-    let comboColor = '#a7f3d0';
-    let glow = 'rgba(110,231,183,0.6)';
-    if (comboCount >= 5 && comboCount <= 9) {
-      tierScale = 1.12;
-      comboColor = '#fde047';
-      glow = 'rgba(251,191,36,0.6)';
-    } else if (comboCount >= 10) {
-      tierScale = 1.2;
-      comboColor = '#fca5a5';
-      glow = 'rgba(248,113,113,0.7)';
+    const comboTier = getComboTier(comboCount, multiplier);
+    const comboStateLabel = getComboStateLabel(comboCount, multiplier);
+    if (!reducedMotion && comboStateLabel && comboStateLabel !== hudAnim.prevComboState) {
+      hudAnim.comboStatePop = 1;
     }
+    hudAnim.prevComboState = comboStateLabel;
+    hudAnim.comboStatePop = reducedMotion ? 0 : Math.max(0, hudAnim.comboStatePop - dt * 2.6);
     const wave = 0.5 + 0.5 * Math.sin(nowMs / 100);
-    const pulse = reducedMotion ? 1 : 1 + 0.055 * wave * hudAnim.comboPulse;
+    const pulse = reducedMotion ? 1 : 1 + comboTier.pulseBoost * wave * hudAnim.comboPulse;
     ctx.save();
-    ctx.fillStyle = comboColor;
-    ctx.shadowColor = glow;
-    ctx.shadowBlur = Math.round(10 * scale);
-    ctx.font = `${Math.round(fontSize * tierScale * pulse)}px sans-serif`;
+    ctx.fillStyle = comboTier.color;
+    ctx.shadowColor = comboTier.glow;
+    ctx.shadowBlur = Math.round((multiplier >= 10 ? 16 : 10) * scale);
+    ctx.font = `${Math.round(fontSize * comboTier.scale * pulse)}px sans-serif`;
     ctx.fillText(`Combo: x${multiplier}`, pad, pad + line);
     ctx.restore();
 
@@ -118,15 +168,38 @@ export function renderHud(ctx, canvas, state) {
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 1;
     ctx.strokeRect(comboMeterX, comboMeterY, comboMeterW, comboMeterH);
-    ctx.fillStyle =
-      comboCount >= 10
-        ? 'rgba(248,113,113,0.9)'
-        : comboCount >= 5
-          ? 'rgba(251,191,36,0.9)'
-          : 'rgba(110,231,183,0.9)';
+    ctx.fillStyle = comboTier.meter;
     ctx.fillRect(comboMeterX, comboMeterY, comboMeterW * hudAnim.comboMeter, comboMeterH);
     ctx.restore();
+
+    if (comboStateLabel) {
+      const tagPadX = Math.round(8 * scale);
+      const tagHeight = Math.round(18 * scale);
+      const tagGap = Math.round(10 * scale);
+      const tagY = comboMeterY + comboMeterH + tagGap;
+      const tagPulse = reducedMotion ? 1 : 1 + 0.12 * hudAnim.comboStatePop;
+      ctx.save();
+      ctx.font = `${Math.round(fontSize * 0.72)}px sans-serif`;
+      const tagWidth = Math.round(ctx.measureText(comboStateLabel).width + tagPadX * 2);
+      ctx.fillStyle = comboTier.accent;
+      ctx.strokeStyle = comboTier.glow;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(comboMeterX, tagY, tagWidth * tagPulse, tagHeight, Math.round(9 * scale));
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = comboTier.color;
+      ctx.globalAlpha = reducedMotion ? 0.9 : 0.8 + 0.2 * wave;
+      ctx.font = `${Math.round(fontSize * 0.72)}px sans-serif`;
+      ctx.fillText(comboStateLabel, comboMeterX + tagPadX, tagY + Math.round(2 * scale));
+      ctx.restore();
+    }
   } else {
+    hudAnim.prevComboState = '';
+    hudAnim.comboStatePop = 0;
     ctx.fillStyle = '#ffffff';
     ctx.font = `${fontSize}px sans-serif`;
     ctx.fillText(`Combo: x${multiplier}`, pad, pad + line);

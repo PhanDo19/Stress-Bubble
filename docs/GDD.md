@@ -74,7 +74,10 @@ Multiplier:
 3–5 hits → x2  
 6–8 hits → x3  
 9–12 hits → x5  
-13+ hits → x8
+13–16 hits → x8  
+17–20 hits → x9  
+21–24 hits → x10  
+then +1 every 4 hits
 
 ---
 

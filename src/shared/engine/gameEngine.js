@@ -68,6 +68,9 @@ function createInitialState(config, modeOverride) {
       goldenCount: 0,
       bombHits: 0,
     },
+    selectedSkin: 'skin_classic',
+    backgroundTheme: 'bg_midnight',
+    selectedAudioPack: 'audio_classic',
     worldWidth: null,
     worldHeight: null,
   };
@@ -96,6 +99,9 @@ function applyState(target, nextState) {
   if (nextState.lowTimeNotified !== undefined) target.lowTimeNotified = nextState.lowTimeNotified;
   if (nextState.config !== undefined) target.config = nextState.config;
   if (nextState.runStats !== undefined) target.runStats = nextState.runStats;
+  if (nextState.selectedSkin !== undefined) target.selectedSkin = nextState.selectedSkin;
+  if (nextState.backgroundTheme !== undefined) target.backgroundTheme = nextState.backgroundTheme;
+  if (nextState.selectedAudioPack !== undefined) target.selectedAudioPack = nextState.selectedAudioPack;
   if (nextState.worldWidth !== undefined) target.worldWidth = nextState.worldWidth;
   if (nextState.worldHeight !== undefined) target.worldHeight = nextState.worldHeight;
 }
@@ -155,6 +161,101 @@ function updateRunStatsMaxCombo(state) {
       ...state.runStats,
       maxCombo: comboCount,
     },
+  };
+}
+
+function getComboCallout(multiplier) {
+  if (multiplier >= 10) {
+    return {
+      text: 'OVERDRIVE',
+      color: '#d8b4fe',
+      glow: 'rgba(192,132,252,0.6)',
+      fontSize: 16,
+      scale: 1.18,
+      vy: -52,
+    };
+  }
+  if (multiplier >= 8) {
+    return {
+      text: 'FRENZY',
+      color: '#fda4af',
+      glow: 'rgba(248,113,113,0.55)',
+      fontSize: 15,
+      scale: 1.1,
+      vy: -48,
+    };
+  }
+  if (multiplier >= 5) {
+    return {
+      text: 'RUSH',
+      color: '#fde68a',
+      glow: 'rgba(251,191,36,0.45)',
+      fontSize: 14,
+      scale: 1.04,
+      vy: -44,
+    };
+  }
+  return null;
+}
+
+function getAwardedTextStyle(multiplier, bubbleType) {
+  if (bubbleType === 'golden') {
+    return {
+      color: '#fde68a',
+      glow: 'rgba(251,191,36,0.55)',
+      fontSize: 16,
+      scale: 1.15,
+      vy: -46,
+      lifeMin: 0.68,
+      lifeMax: 0.78,
+      driftRange: 12,
+    };
+  }
+  if (multiplier >= 10) {
+    return {
+      color: '#e9d5ff',
+      glow: 'rgba(192,132,252,0.5)',
+      fontSize: 15,
+      scale: 1.12,
+      vy: -44,
+      lifeMin: 0.64,
+      lifeMax: 0.74,
+      driftRange: 14,
+    };
+  }
+  if (multiplier >= 8) {
+    return {
+      color: '#fecaca',
+      glow: 'rgba(248,113,113,0.45)',
+      fontSize: 15,
+      scale: 1.08,
+      vy: -42,
+      lifeMin: 0.62,
+      lifeMax: 0.72,
+      driftRange: 15,
+    };
+  }
+  if (multiplier >= 5) {
+    return {
+      color: '#fef08a',
+      glow: 'rgba(251,191,36,0.4)',
+      fontSize: 14,
+      scale: 1.04,
+      vy: -40,
+      lifeMin: 0.6,
+      lifeMax: 0.7,
+      driftRange: 16,
+    };
+  }
+  return {
+    color: '#ffffff',
+    glow: 'rgba(255,255,255,0.25)',
+    fontSize: 14,
+    scale: 1,
+    vy: -38,
+    lifeMin: 0.56,
+    lifeMax: 0.64,
+    driftRange: 18,
   };
 }
 
@@ -248,6 +349,9 @@ export function createGameEngine(options = {}) {
     engine.lowTimeNotified = base.lowTimeNotified;
     engine.config = base.config;
     engine.runStats = base.runStats;
+    engine.selectedSkin = engine.selectedSkin || base.selectedSkin;
+    engine.backgroundTheme = engine.backgroundTheme || base.backgroundTheme;
+    engine.selectedAudioPack = engine.selectedAudioPack || base.selectedAudioPack;
     engine.worldWidth = base.worldWidth;
     engine.worldHeight = base.worldHeight;
     lastTimestamp = null;
@@ -481,12 +585,56 @@ export function createGameEngine(options = {}) {
 
     const maxParticles =
       typeof config.maxParticles === 'number' ? config.maxParticles : 30;
+    const comboBurstScale =
+      next.combo?.multiplier >= 10
+        ? 1.6
+        : next.combo?.multiplier >= 8
+          ? 1.35
+          : next.combo?.multiplier >= 5
+            ? 1.15
+            : 1;
     const adaptiveMaxParticles = Math.max(
       8,
       Math.round(maxParticles * particleDetailScale)
     );
     const maxFloatingTexts =
       typeof config.maxFloatingTexts === 'number' ? config.maxFloatingTexts : 24;
+    const previousMultiplier = engine.combo?.multiplier ?? 1;
+    const nextMultiplier = next.combo?.multiplier ?? 1;
+    const comboCallout =
+      nextMultiplier > previousMultiplier ? getComboCallout(nextMultiplier) : null;
+    const awardedTextStyle = isBomb
+      ? {
+          color: '#fda4af',
+          glow: 'rgba(239,68,68,0.45)',
+          fontSize: 14,
+          scale: 1.04,
+          vy: -36,
+          lifeMin: 0.58,
+          lifeMax: 0.66,
+          driftRange: 14,
+        }
+      : getAwardedTextStyle(nextMultiplier, hit.popped.type);
+    const floatingTexts = emitFloatingText(
+      next.floatingTexts,
+      hit.popped.x,
+      hit.popped.y,
+      awardedText,
+      rng,
+      maxFloatingTexts,
+      awardedTextStyle
+    );
+    const floatingTextsWithCallout = comboCallout
+      ? emitFloatingText(
+          floatingTexts,
+          hit.popped.x,
+          hit.popped.y - 18,
+          comboCallout.text,
+          rng,
+          maxFloatingTexts,
+          comboCallout
+        )
+      : floatingTexts;
     next = {
       ...next,
       particles: emitPopBurst(
@@ -495,16 +643,9 @@ export function createGameEngine(options = {}) {
         hit.popped.y,
         adaptiveMaxParticles,
         rng,
-        particleDetailScale
+        particleDetailScale * comboBurstScale
       ),
-      floatingTexts: emitFloatingText(
-        next.floatingTexts,
-        hit.popped.x,
-        hit.popped.y,
-        awardedText,
-        rng,
-        maxFloatingTexts
-      ),
+      floatingTexts: floatingTextsWithCallout,
     };
 
     applyState(engine, next);
@@ -523,6 +664,18 @@ export function createGameEngine(options = {}) {
     };
   }
 
+  function setLoadout(loadout = {}) {
+    if (loadout.selectedSkin) {
+      engine.selectedSkin = loadout.selectedSkin;
+    }
+    if (loadout.backgroundTheme) {
+      engine.backgroundTheme = loadout.backgroundTheme;
+    }
+    if (loadout.selectedAudioPack) {
+      engine.selectedAudioPack = loadout.selectedAudioPack;
+    }
+  }
+
   engine.init = init;
   engine.start = start;
   engine.restart = restart;
@@ -531,6 +684,7 @@ export function createGameEngine(options = {}) {
   engine.togglePause = togglePause;
   engine.handleClick = handleClick;
   engine.getRunStats = getRunStats;
+  engine.setLoadout = setLoadout;
   engine.on = on;
 
   return engine;

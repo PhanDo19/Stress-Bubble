@@ -4,6 +4,7 @@
   'streak',
   'daily',
   'shop',
+  'progression',
   'settings',
   'tutorial',
   'achievements',
@@ -153,6 +154,22 @@ export async function loadShop() {
 
 export async function saveShop(shopObj) {
   await save({ shop: shopObj });
+}
+
+export async function loadProgression() {
+  const data = await load('progression');
+  const progression = data.progression || {};
+  return {
+    firstWinDateKey: progression.firstWinDateKey || null,
+    runsPlayed: Number(progression.runsPlayed) || 0,
+    totalPlayMs: Number(progression.totalPlayMs) || 0,
+    lifetimeGoldenCount: Number(progression.lifetimeGoldenCount) || 0,
+    bestComboEver: Number(progression.bestComboEver) || 0,
+  };
+}
+
+export async function saveProgression(progressionObj) {
+  await save({ progression: progressionObj });
 }
 
 export async function loadSettings() {
