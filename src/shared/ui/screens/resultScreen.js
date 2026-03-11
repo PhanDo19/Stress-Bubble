@@ -1,4 +1,5 @@
 import { ACHIEVEMENTS } from '../../systems/achievementSystem.js';
+import { getCatalog, isItemUnlocked } from '../shopSystem.js';
 import { t } from '../i18n.js';
 
 function ensureRoot(rootEl) {
@@ -31,6 +32,57 @@ function formatDaily(daily) {
     canClaim: !!daily.completed && !daily.rewardClaimed,
     reward: Number(daily.rewardCoins) || 200,
   };
+}
+
+function getNextGoals(result, model) {
+  const goals = [];
+  const rankProgress = result?.rankProgress || null;
+  if (rankProgress?.nextRank) {
+    const remaining = Math.max(
+      0,
+      Number(rankProgress.nextScore || 0) - Number(result?.score || 0)
+    );
+    goals.push({
+      tone: 'rank',
+      text: t('result.goal_rank', {
+        value: remaining,
+        rank: rankProgress.nextRank,
+      }),
+    });
+  }
+
+  const dailyInfo = formatDaily(model?.daily);
+  if (dailyInfo.completed) {
+    goals.push({
+      tone: 'daily',
+      text: t('result.goal_daily_done'),
+    });
+  } else if (dailyInfo.text && dailyInfo.text !== t('daily.none')) {
+    goals.push({
+      tone: 'daily',
+      text: t('result.goal_daily', { value: dailyInfo.text.replace(/^Daily:\s*/i, '') }),
+    });
+  }
+
+  const ownedSkins = Array.isArray(model?.ownedSkins) ? model.ownedSkins : ['skin_classic'];
+  const coins = Number(model?.coins) || 0;
+  const nextSkin = getCatalog('bubble')
+    .filter((item) => item.price > 0)
+    .filter((item) => !ownedSkins.includes(item.id))
+    .filter((item) => isItemUnlocked(model, item))
+    .sort((a, b) => a.price - b.price)[0];
+
+  if (nextSkin) {
+    goals.push({
+      tone: 'skin',
+      text: t('result.goal_skin', {
+        value: Math.max(0, nextSkin.price - coins),
+        skin: nextSkin.name,
+      }),
+    });
+  }
+
+  return goals.slice(0, 3);
 }
 
 function createButton(text, variant = 'ghost', options = {}) {
@@ -158,8 +210,10 @@ export function renderResult({
   isPersonalBest = false,
   onReplay,
   onCopy,
+  onShare,
   onHome,
   onClaim,
+  actionStatus = '',
 }) {
   const root = ensureRoot(rootEl);
   if (!root) return;
@@ -175,6 +229,7 @@ export function renderResult({
     : [];
 
   const dailyInfo = formatDaily(model?.daily);
+  const nextGoals = getNextGoals(result, model);
 
   const container = document.createElement('div');
   container.style.display = 'flex';
@@ -182,10 +237,13 @@ export function renderResult({
   container.style.alignItems = 'stretch';
   container.style.textAlign = 'center';
   container.style.gap = '12px';
-  container.style.padding = '28px 28px 24px';
+  container.style.padding = '24px 20px 20px';
   container.style.color = '#ffffff';
-  container.style.minWidth = '320px';
+  container.style.minWidth = 'min(320px, calc(100vw - 24px))';
+  container.style.width = 'min(100%, 380px)';
   container.style.maxWidth = '380px';
+  container.style.maxHeight = 'calc(100% - 20px)';
+  container.style.overflowY = 'auto';
   container.style.borderRadius = '20px';
   container.style.background = 'rgba(10,14,26,0.7)';
   container.style.border = '1px solid rgba(255,255,255,0.08)';
@@ -228,6 +286,45 @@ export function renderResult({
   const coinsEl = document.createElement('div');
   coinsEl.textContent = t('result.coins_plus', { value: coinsEarned });
   coinsEl.style.fontSize = 'calc(15px * var(--ui-scale, 1))';
+
+  const nextGoalsBlock = document.createElement('div');
+  nextGoalsBlock.style.display = nextGoals.length > 0 ? 'flex' : 'none';
+  nextGoalsBlock.style.flexDirection = 'column';
+  nextGoalsBlock.style.gap = '8px';
+  nextGoalsBlock.style.padding = '12px';
+  nextGoalsBlock.style.borderRadius = '12px';
+  nextGoalsBlock.style.background = 'rgba(255,255,255,0.04)';
+  nextGoalsBlock.style.border = '1px solid rgba(255,255,255,0.08)';
+
+  const nextGoalsTitle = document.createElement('div');
+  nextGoalsTitle.textContent = t('result.next_goal_title');
+  nextGoalsTitle.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+  nextGoalsTitle.style.fontWeight = '600';
+  nextGoalsTitle.style.opacity = '0.88';
+  nextGoalsBlock.appendChild(nextGoalsTitle);
+
+  nextGoals.forEach((goal) => {
+    const row = document.createElement('div');
+    row.textContent = goal.text;
+    row.style.fontSize = 'calc(12px * var(--ui-scale, 1))';
+    row.style.opacity = '0.82';
+    row.style.textAlign = 'left';
+    row.style.padding = '8px 10px';
+    row.style.borderRadius = '10px';
+    row.style.background =
+      goal.tone === 'rank'
+        ? 'rgba(245,158,11,0.12)'
+        : goal.tone === 'daily'
+          ? 'rgba(56,189,248,0.12)'
+          : 'rgba(110,231,183,0.12)';
+    row.style.border =
+      goal.tone === 'rank'
+        ? '1px solid rgba(245,158,11,0.18)'
+        : goal.tone === 'daily'
+          ? '1px solid rgba(56,189,248,0.18)'
+          : '1px solid rgba(110,231,183,0.18)';
+    nextGoalsBlock.appendChild(row);
+  });
 
   const rankProgressBlock = document.createElement('div');
   rankProgressBlock.style.display = rankProgress ? 'flex' : 'none';
@@ -273,7 +370,7 @@ export function renderResult({
 
   const claimButton = createButton(t('action.claim_plus', { value: dailyInfo.reward }), 'solid', {
     icon: createIcon('+'),
-    iconOnly: true,
+    compact: true,
   });
   claimButton.addEventListener('click', () => {
     if (typeof onClaim === 'function') onClaim();
@@ -285,35 +382,61 @@ export function renderResult({
   actions.style.display = 'flex';
   actions.style.gap = '10px';
   actions.style.justifyContent = 'center';
+  actions.style.flexWrap = 'wrap';
 
   const replayButton = createButton(t('action.replay'), 'solid', {
     icon: createIcon('\u21bb'),
-    iconOnly: true,
+    compact: true,
   });
+  replayButton.style.minWidth = '112px';
   replayButton.addEventListener('click', () => {
     if (typeof onReplay === 'function') onReplay();
   });
 
   const copyButton = createButton(t('action.copy'), 'ghost', {
     icon: createIcon('\u2398'),
-    iconOnly: true,
+    compact: true,
   });
   copyButton.addEventListener('click', () => {
     if (typeof onCopy === 'function') onCopy();
   });
 
-  actions.appendChild(replayButton);
-  actions.appendChild(copyButton);
+  const shareButton =
+    typeof onShare === 'function'
+      ? createButton(t('action.share'), 'ghost', {
+          icon: createIcon('\u2197'),
+          compact: true,
+        })
+      : null;
+  if (shareButton) {
+    shareButton.addEventListener('click', () => {
+      onShare();
+    });
+  }
+
+  const actionStatusEl = document.createElement('div');
+  actionStatusEl.textContent = actionStatus ? t(actionStatus) : '';
+  actionStatusEl.style.minHeight = '16px';
+  actionStatusEl.style.fontSize = 'calc(11px * var(--ui-scale, 1))';
+  actionStatusEl.style.opacity = actionStatus ? '0.82' : '0';
+  actionStatusEl.style.color = 'rgba(255,255,255,0.82)';
+
   if (typeof onHome === 'function') {
     const homeButton = createButton(t('action.home'), 'ghost', {
       icon: createIcon('\u2302'),
-      iconOnly: true,
+      compact: true,
     });
+    homeButton.style.minWidth = '96px';
     homeButton.addEventListener('click', () => {
       onHome();
     });
+    actions.appendChild(replayButton);
     actions.appendChild(homeButton);
+  } else {
+    actions.appendChild(replayButton);
   }
+  actions.appendChild(copyButton);
+  if (shareButton) actions.appendChild(shareButton);
 
   container.appendChild(title);
   container.appendChild(scoreEl);
@@ -321,6 +444,7 @@ export function renderResult({
   if (nearMiss) container.appendChild(nearEl);
   if (isPersonalBest) container.appendChild(pbEl);
   container.appendChild(coinsEl);
+  if (nextGoals.length > 0) container.appendChild(nextGoalsBlock);
   container.appendChild(dailyEl);
   if (rankProgress) container.appendChild(rankProgressBlock);
 
@@ -377,5 +501,6 @@ export function renderResult({
   }
   container.appendChild(claimRow);
   container.appendChild(actions);
+  container.appendChild(actionStatusEl);
   root.appendChild(container);
 }

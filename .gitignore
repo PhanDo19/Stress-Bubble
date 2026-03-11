@@ -1,2 +1,9 @@
 docs/MVP_REAL_PLAN.md
 docs/deep-research-report.md
+/.chrome-mvp-profile/
+__pycache__/
+*.log
+*.tmp
+*.zip
+.DS_Store
+Thumbs.db

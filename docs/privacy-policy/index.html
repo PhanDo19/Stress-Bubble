@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stress Bubble Privacy Policy</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1023;
+        --panel: rgba(10, 14, 26, 0.88);
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #f3f4f6;
+        --muted: rgba(243, 244, 246, 0.74);
+        --accent: #6ee7b7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font: 16px/1.6 Georgia, "Times New Roman", serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 34%),
+          radial-gradient(circle at bottom right, rgba(110, 231, 183, 0.14), transparent 28%),
+          linear-gradient(180deg, #0b1023, #05070f 62%);
+      }
+
+      main {
+        width: min(840px, calc(100vw - 32px));
+        margin: 40px auto;
+        padding: 28px 24px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--panel);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      }
+
+      h1, h2 {
+        margin: 0 0 12px;
+        line-height: 1.2;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      h2 {
+        margin-top: 26px;
+        font-size: 1.15rem;
+        color: var(--accent);
+      }
+
+      p, li {
+        color: var(--muted);
+      }
+
+      ul {
+        margin: 10px 0 0 20px;
+        padding: 0;
+      }
+
+      a {
+        color: var(--text);
+      }
+
+      .eyebrow {
+        margin-bottom: 10px;
+        font: 600 0.82rem/1.2 Arial, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Stress Bubble</div>
+      <h1>Privacy Policy</h1>
+      <p>
+        Stress Bubble stores limited gameplay data locally in your browser so the extension can
+        remember progress and settings.
+      </p>
+
+      <h2>Data stored locally</h2>
+      <ul>
+        <li>best scores by mode</li>
+        <li>coins</li>
+        <li>streak progress</li>
+        <li>daily challenge state</li>
+        <li>shop unlocks and selected skin</li>
+        <li>gameplay settings</li>
+        <li>tutorial completion state</li>
+        <li>unlocked achievements</li>
+      </ul>
+
+      <h2>How data is used</h2>
+      <ul>
+        <li>to restore your game state between sessions</li>
+        <li>to keep your settings and progression available on the same browser profile</li>
+        <li>to power gameplay systems such as streaks, challenges, and rewards</li>
+      </ul>
+
+      <h2>Data sharing</h2>
+      <ul>
+        <li>Stress Bubble does not send this data to a remote server</li>
+        <li>Stress Bubble does not sell or share this data with third parties</li>
+        <li>Stress Bubble does not use this data for advertising</li>
+      </ul>
+
+      <h2>Storage location</h2>
+      <p>
+        Data is stored in <code>chrome.storage.local</code> when available, with local browser
+        fallback storage used only outside the extension environment.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        For support or privacy-related questions, contact:
+        <a href="mailto:alesando0119@gmail.com">alesando0119@gmail.com</a>
+      </p>
+    </main>
+  </body>
+</html>

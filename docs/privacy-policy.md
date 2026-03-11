@@ -31,4 +31,6 @@ Data is stored in `chrome.storage.local` when available, with local browser fall
 
 ## Contact
 
-Before store submission, replace this section with the maintainer contact email or support URL used in the Chrome Web Store listing.
+For support or privacy-related questions, contact:
+
+alesando0119@gmail.com

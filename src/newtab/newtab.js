@@ -31,6 +31,7 @@ import { createAudioManager } from '../shared/audio/audioManager.js';
 import { evaluateAchievements } from '../shared/systems/achievementSystem.js';
 import { computeRank } from '../shared/systems/rankSystem.js';
 import { createGameConfig, normalizeSettings, syncGameConfig } from '../shared/systems/gameConfig.js';
+import { buildResultShareText, copyResultText, shareResultText } from '../shared/ui/shareActions.js';
 
 function createLayout() {
   const root = document.createElement('div');
@@ -120,10 +121,6 @@ function syncLoadoutIntoSettings(model) {
   });
 }
 
-function buildCopyText(result) {
-  return `Stress Bubble - ${result.rank} - Score ${result.score}`;
-}
-
 async function setup() {
   let model = await loadModel();
   syncLoadoutIntoSettings(model);
@@ -131,6 +128,7 @@ async function setup() {
   let shopCategory = 'bubble';
   let lastResult = null;
   let lastPersonalBest = false;
+  let lastActionStatus = '';
   const audio = createAudioManager();
   const config = createGameConfig(model.settings);
 
@@ -229,16 +227,37 @@ async function setup() {
       result,
       model,
       isPersonalBest,
+      actionStatus: lastActionStatus,
       onReplay: () => startGame(result.mode || selectedMode),
       onCopy: async () => {
-        const text = buildCopyText(result);
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          window.prompt('Copy result', text);
+        const outcome = await copyResultText(buildResultShareText(result));
+        lastActionStatus =
+          outcome.kind === 'copied'
+            ? 'result.copy_success'
+            : outcome.kind === 'manual'
+              ? 'result.copy_manual'
+              : 'result.copy_error';
+        showResult(result, isPersonalBest);
+      },
+      onShare: async () => {
+        const outcome = await shareResultText({
+          title: 'Stress Bubble',
+          text: buildResultShareText(result),
+        });
+        lastActionStatus =
+          outcome.kind === 'shared'
+            ? 'result.share_success'
+            : outcome.kind === 'shared_via_copy'
+              ? 'result.share_fallback_copy'
+              : outcome.kind === 'manual'
+                ? 'result.share_manual'
+                : lastActionStatus;
+        if (outcome.kind !== 'cancelled') {
+          showResult(result, isPersonalBest);
         }
       },
       onHome: () => {
+        lastActionStatus = '';
         engine.init();
         showHome();
       },
@@ -318,10 +337,12 @@ async function setup() {
 
     lastResult = result;
     lastPersonalBest = isPersonalBest;
+    lastActionStatus = '';
     showResult(result, isPersonalBest);
   }
 
   function startGame(mode = selectedMode) {
+    lastActionStatus = '';
     if (!model.tutorialSeen) {
       model.tutorialSeen = true;
       saveTutorial(true);

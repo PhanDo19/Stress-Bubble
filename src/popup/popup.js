@@ -12,12 +12,15 @@ import {
   loadShop,
   loadProgression,
   loadSettings,
+  loadTutorial,
   save,
   saveBestScore,
   saveAchievements,
   saveShop,
   saveProgression,
   saveSettings,
+  saveTutorial,
+  clearAll,
 } from '../shared/storage/storage.js';
 import { getTodayKey, getDailyChallenge, evaluateDailyProgress } from '../shared/systems/dailySystem.js';
 import { updateStreak } from '../shared/systems/streakSystem.js';
@@ -28,6 +31,7 @@ import { computeRank } from '../shared/systems/rankSystem.js';
 import { createGameConfig, normalizeSettings, syncGameConfig } from '../shared/systems/gameConfig.js';
 import { buyItem, normalizeShopState, pickShopState } from '../shared/ui/shopSystem.js';
 import { createAudioManager } from '../shared/audio/audioManager.js';
+import { buildResultShareText, copyResultText, shareResultText } from '../shared/ui/shareActions.js';
 
 function createLayout() {
   const root = document.createElement('div');
@@ -61,7 +65,7 @@ function createLayout() {
 }
 
 async function loadModel() {
-  const [bestScores, coins, streak, daily, achievements, shop, progression, settings] = await Promise.all([
+  const [bestScores, coins, streak, daily, achievements, shop, progression, settings, tutorialSeen] = await Promise.all([
     loadBestScores(),
     loadCoins(),
     loadStreak(),
@@ -70,6 +74,7 @@ async function loadModel() {
     loadShop(),
     loadProgression(),
     loadSettings(),
+    loadTutorial(),
   ]);
 
   const todayKey = getTodayKey();
@@ -100,6 +105,7 @@ async function loadModel() {
     selectedAudioPack: shopState.selectedAudioPack,
     progression,
     settings: normalizedSettings,
+    tutorialSeen: !!tutorialSeen,
   };
 }
 
@@ -112,10 +118,6 @@ function syncLoadoutIntoSettings(model) {
   });
 }
 
-function buildCopyText(result) {
-  return `Stress Bubble - ${result.rank} - Score ${result.score}`;
-}
-
 async function setup() {
   const { canvas, overlay } = createLayout();
   const { ctx } = setupHiDPICanvas(canvas);
@@ -126,6 +128,9 @@ async function setup() {
   let shopCategory = 'bubble';
   let compactSettingsOpen = false;
   let compactSettingsSection = 'menu';
+  let lastResult = null;
+  let lastPersonalBest = false;
+  let lastActionStatus = '';
   const config = createGameConfig(model.settings);
   config.hudVisibility = 'playing-only';
   const audio = createAudioManager();
@@ -195,12 +200,31 @@ async function setup() {
       onPlay: () => startGame(selectedMode),
       onShop: () => showShop(),
       onOpenFullscreen: () => openFullScreenGame(),
+      showTutorial: !model.tutorialSeen,
+      onDismissTutorial: async () => {
+        if (model.tutorialSeen) return;
+        model.tutorialSeen = true;
+        await saveTutorial(true);
+        showHome();
+      },
       onSettingsChange: async (patch) => {
         model.settings = normalizeSettings({ ...model.settings, ...patch });
         syncGameConfig(config, model.settings);
         await saveSettings(model.settings);
         audio.setSettings({ ...model.settings, audioPack: model.selectedAudioPack });
         compactSettingsOpen = true;
+        showHome();
+      },
+      onReset: async () => {
+        const ok = window.confirm('Reset all data? This cannot be undone.');
+        if (!ok) return;
+        await clearAll();
+        model = await loadModel();
+        syncLoadoutIntoSettings(model);
+        syncGameConfig(config, model.settings);
+        compactSettingsOpen = false;
+        compactSettingsSection = 'menu';
+        applyOwnedPresentation();
         showHome();
       },
     });
@@ -232,24 +256,56 @@ async function setup() {
     });
   }
 
-  function showResult(result) {
+  function showResult(result, isPersonalBest) {
     overlay.style.pointerEvents = 'auto';
     renderResult({
       rootEl: overlay,
       result,
       model,
+      isPersonalBest,
+      actionStatus: lastActionStatus,
       onReplay: () => startGame(result.mode || selectedMode),
       onCopy: async () => {
-        const text = buildCopyText(result);
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          window.prompt('Copy result', text);
+        const outcome = await copyResultText(buildResultShareText(result));
+        lastActionStatus =
+          outcome.kind === 'copied'
+            ? 'result.copy_success'
+            : outcome.kind === 'manual'
+              ? 'result.copy_manual'
+              : 'result.copy_error';
+        showResult(result, isPersonalBest);
+      },
+      onShare: async () => {
+        const outcome = await shareResultText({
+          title: 'Stress Bubble',
+          text: buildResultShareText(result),
+        });
+        lastActionStatus =
+          outcome.kind === 'shared'
+            ? 'result.share_success'
+            : outcome.kind === 'shared_via_copy'
+              ? 'result.share_fallback_copy'
+              : outcome.kind === 'manual'
+                ? 'result.share_manual'
+                : lastActionStatus;
+        if (outcome.kind !== 'cancelled') {
+          showResult(result, isPersonalBest);
         }
       },
       onHome: () => {
+        lastActionStatus = '';
         engine.init();
         showHome();
+      },
+      onClaim: async () => {
+        if (!model.daily || !model.daily.completed || model.daily.rewardClaimed) return;
+        const reward = model.daily.rewardCoins || 200;
+        model.coins += reward;
+        model.daily.rewardClaimed = true;
+        await save({ coins: model.coins, daily: model.daily });
+        if (lastResult) {
+          showResult(lastResult, lastPersonalBest);
+        }
       },
     });
   }
@@ -278,12 +334,10 @@ async function setup() {
       lifetimeGoldenCount: Number(model.progression?.lifetimeGoldenCount) + (Number(runStats.goldenCount) || 0),
       bestComboEver: Math.max(Number(model.progression?.bestComboEver) || 0, Number(runStats.maxCombo) || 0),
     };
-    if (model.daily.completed && !model.daily.rewardClaimed) {
-      model.coins += model.daily.rewardCoins || 200;
-      model.daily.rewardClaimed = true;
-    }
-
-    model.bestScores = await saveBestScore(runStats.mode, runStats.score);
+    const modeKey = runStats.mode || selectedMode || 'classic';
+    const previousBest = model.bestScores?.[modeKey] ?? 0;
+    model.bestScores = await saveBestScore(modeKey, runStats.score);
+    const isPersonalBest = runStats.score > previousBest;
 
     const achievementResult = evaluateAchievements(model.achievements, runStats);
     model.achievements = achievementResult.unlocked;
@@ -298,18 +352,36 @@ async function setup() {
     await saveAchievements(model.achievements);
     await saveProgression(model.progression);
 
-    showResult({
+    const result = {
       score: runStats.score,
       rank: rankInfo.rank,
       nearMiss: rankInfo.nearMiss,
+      rankProgress: rankInfo.rankProgress,
       coinsEarned: coinsEarned + firstWinBonus,
       mode: runStats.mode,
       firstWinBonus,
       achievementsUnlocked: achievementResult.newlyUnlocked,
-    });
+      runStats: {
+        pops: runStats.pops || 0,
+        misses: runStats.misses || 0,
+        maxCombo: runStats.maxCombo || 0,
+        goldenCount: runStats.goldenCount || 0,
+        bombHits: runStats.bombHits || 0,
+      },
+    };
+
+    lastResult = result;
+    lastPersonalBest = isPersonalBest;
+    lastActionStatus = '';
+    showResult(result, isPersonalBest);
   }
 
   function startGame(mode) {
+    lastActionStatus = '';
+    if (!model.tutorialSeen) {
+      model.tutorialSeen = true;
+      saveTutorial(true);
+    }
     overlay.innerHTML = '';
     overlay.style.pointerEvents = 'none';
     engine.setLoadout({
